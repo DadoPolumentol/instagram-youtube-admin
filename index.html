@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Instagram → YouTube Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<h2>Admin Panel</h2>
+
+<button id="login">Login with Google</button>
+<button id="logout">Logout</button>
+
+<div id="panel" style="display:none;">
+
+  <h3>Add Instagram Link</h3>
+  <input type="text" id="link" placeholder="Instagram URL">
+  <input type="text" id="title" placeholder="Optional Title">
+  <input type="text" id="description" placeholder="Optional Description">
+  <button id="submit">Submit</button>
+
+  <h3>Last 10 Videos</h3>
+  <div id="videos"></div>
+
+</div>
+
+<script>
+const supabase = window.supabase.createClient(
+  "https://colyuvayzgcdifnuivnz.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM"
+);
+
+const ADMIN_EMAIL = "crazychannelprofessional@gmail.com";
+
+async function checkUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user && user.email === ADMIN_EMAIL) {
+    document.getElementById("panel").style.display = "block";
+    loadVideos();
+  } else {
+    document.getElementById("panel").style.display = "none";
+    console.log("Unauthorized or not logged in");
+  }
+}
+
+document.getElementById("login").onclick = async () => {
+  await supabase.auth.signInWithOAuth({ provider: "google" });
+};
+
+document.getElementById("logout").onclick = async () => {
+  await supabase.auth.signOut();
+  location.reload();
+};
+
+document.getElementById("submit").onclick = async () => {
+  const link = document.getElementById("link").value.trim();
+  const title = document.getElementById("title").value.trim();
+  const description = document.getElementById("description").value.trim();
+
+  if (!link) {
+    alert("Instagram link required");
+    return;
+  }
+
+  await supabase.from("queue").insert([{
+    link: link,
+    title: title || null,
+    description: description || null,
+    status: "pending"
+  }]);
+
+  alert("Inserted!");
+  document.getElementById("link").value = "";
+  document.getElementById("title").value = "";
+  document.getElementById("description").value = "";
+  loadVideos();
+};
+
+async function loadVideos() {
+  const { data } = await supabase
+    .from("queue")
+    .select("*")
+    .eq("status", "done")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const container = document.getElementById("videos");
+  container.innerHTML = "";
+
+  data.forEach(video => {
+    container.innerHTML += `
+      <div>
+        Instagram: <a href="${video.link}" target="_blank">View</a><br>
+        YouTube: ${video.youtube_video_id ? 
+          `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch</a>` 
+          : "Not uploaded yet"}
+        <hr>
+      </div>
+    `;
+  });
+}
+
+// Run on page load
+checkUser();
+</script>
+
+</body>
+</html>
