@@ -64,14 +64,13 @@ async function checkUser() {
 document.getElementById("login").onclick = async () => {
   const { data, error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
-    options: { flowType: 'popup' } // <--- popup avoids redirect entirely
+    options: { flowType: 'popup' } // popup login, avoids redirect
   });
 
   if (error) {
     console.log("Login error:", error);
-    alert("Login failed. See console.");
   } else {
-    checkUser(); // immediately shows admin panel
+    checkUser(); // immediately show admin panel
   }
 };
 
@@ -147,7 +146,7 @@ async function loadVideos() {
 // ----------------------
 // Page load
 // ----------------------
-initAuth();
+checkUser();
 
 </script>
 </body>
