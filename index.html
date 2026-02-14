@@ -11,6 +11,7 @@
 
 <button id="login">Login with Google</button>
 <button id="logout">Logout</button>
+<button id="clearAuth" style="background-color: #dc3545; color: white;">Clear Auth & Retry</button>
 
 <div id="panel" style="display:none; margin-top: 20px;">
 
@@ -28,43 +29,11 @@
 <script>
 // ✅ Fix: use a different variable name to avoid global conflict
 const supabaseClient = window.supabase.createClient(
-  "https://colyuvayzgcdifnuivnz.supabase.co", // your Supabase URL
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM" // your anon key
+  "https://colyuvayzgcdifnuivnz.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM"
 );
 
 const ADMIN_EMAIL = "crazychannelprofessional@gmail.com";
-
-// ----------------------
-// Handle OAuth session on page load
-// ----------------------
-async function initAuth() {
-  // Check if we're returning from OAuth redirect
-  const hashParams = new URLSearchParams(window.location.hash.substring(1));
-  if (hashParams.has('access_token')) {
-    // Clear the hash from URL
-    history.replaceState(null, '', window.location.pathname);
-  }
-  
-  // Get current session
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  
-  checkUser();
-}
-
-// ----------------------
-// Show or hide admin panel
-// ----------------------
-async function checkUser() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-
-  if (user && user.email === ADMIN_EMAIL) {
-    document.getElementById("panel").style.display = "block";
-    loadVideos();
-  } else {
-    document.getElementById("panel").style.display = "none";
-    console.log("Unauthorized or not logged in");
-  }
-}
 
 // ----------------------
 // Detect if mobile device
@@ -72,47 +41,6 @@ async function checkUser() {
 function isMobileDevice() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
-
-// ----------------------
-// Login button
-// ----------------------
-document.getElementById("login").onclick = async () => {
-  const isMobile = isMobileDevice();
-  
-  const { data, error } = await supabaseClient.auth.signInWithOAuth({
-    provider: 'google',
-    options: { 
-      redirectTo: window.location.href, // redirect back to current page
-      ...(isMobile ? {} : { flowType: 'popup' }) // popup only on desktop
-    }
-  });
-
-  if (error) {
-    console.log("Login error:", error);
-  } else if (!isMobile) {
-    checkUser(); // for popup flow, immediately check
-  }
-  // For redirect flow (mobile), checkUser is called by initAuth on page load
-};
-
-
-// ----------------------
-// Logout button - improved with full cleanup
-// ----------------------
-document.getElementById("logout").onclick = async () => {
-  await supabaseClient.auth.signOut();
-  
-  // Clear all Supabase storage
-  localStorage.clear();
-  sessionStorage.clear();
-  
-  // Clear URL hash if present
-  if (window.location.hash) {
-    history.replaceState(null, '', window.location.pathname);
-  }
-  
-  location.reload();
-};
 
 // ----------------------
 // Handle OAuth session on page load - with error handling
@@ -154,6 +82,60 @@ async function initAuth() {
 }
 
 // ----------------------
+// Show or hide admin panel
+// ----------------------
+async function checkUser() {
+  const { data: { user } } = await supabaseClient.auth.getUser();
+
+  if (user && user.email === ADMIN_EMAIL) {
+    document.getElementById("panel").style.display = "block";
+    loadVideos();
+  } else {
+    document.getElementById("panel").style.display = "none";
+    console.log("Unauthorized or not logged in");
+  }
+}
+
+// ----------------------
+// Login button
+// ----------------------
+document.getElementById("login").onclick = async () => {
+  const isMobile = isMobileDevice();
+  
+  const { data, error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: { 
+      redirectTo: window.location.href,
+      ...(isMobile ? {} : { flowType: 'popup' })
+    }
+  });
+
+  if (error) {
+    console.log("Login error:", error);
+  } else if (!isMobile) {
+    checkUser();
+  }
+};
+
+// ----------------------
+// Logout button - improved with full cleanup
+// ----------------------
+document.getElementById("logout").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  
+  // Clear all Supabase storage
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  // Clear URL hash if present
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname);
+  }
+  
+  location.reload();
+};
+
+// ----------------------
 // Submit Instagram link
 // ----------------------
 document.getElementById("submit").onclick = async () => {
@@ -162,22 +144,6 @@ document.getElementById("submit").onclick = async () => {
   const description = document.getElementById("description").value.trim();
 
   if (!link) { alert("Instagram link required"); return; }
-
-  // Check for duplicates
-  const { data: existing } = await supabaseClient
-    .from("queue")
-    .select("id, status")
-    .eq("link", link)
-    .limit(1);
-
-  if (existing && existing.length > 0) {
-    const status = existing[0].status;
-    if (confirm(`This link was already submitted (status: ${status}). Submit again anyway?`)) {
-      // Continue
-    } else {
-      return;
-    }
-  }
 
   try {
     await supabaseClient.from("queue").insert([{
@@ -206,34 +172,20 @@ async function loadVideos() {
     const { data } = await supabaseClient
       .from("queue")
       .select("*")
+      .eq("status", "done")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(10);
 
     const container = document.getElementById("videos");
     container.innerHTML = "";
 
     data.forEach(video => {
-      const scheduledTime = video.scheduled_publish_at 
-        ? new Date(video.scheduled_publish_at).toLocaleString() 
-        : "Not scheduled";
-      
-      const statusColor = {
-        'pending': 'orange',
-        'processing': 'blue',
-        'done': 'green',
-        'failed': 'red'
-      }[video.status] || 'gray';
-
       container.innerHTML += `
-        <div style="margin-bottom:15px; padding:10px; border-left: 4px solid ${statusColor};">
-          <strong>Status:</strong> <span style="color: ${statusColor}">${video.status}</span><br>
-          <strong>Instagram:</strong> <a href="${video.link}" target="_blank">View Reel</a><br>
-          <strong>YouTube:</strong> ${video.youtube_video_id ? 
+        <div style="margin-bottom:10px;">
+          Instagram: <a href="${video.link}" target="_blank">View</a><br>
+          YouTube: ${video.youtube_video_id ? 
             `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch</a>` 
-            : "Not uploaded yet"}<br>
-          <strong>Scheduled:</strong> ${scheduledTime}<br>
-          ${video.error ? `<strong style="color:red">Error:</strong> ${video.error}<br>` : ''}
-          ${video.title ? `<strong>Title:</strong> ${video.title}<br>` : ''}
+            : "Not uploaded yet"}
           <hr>
         </div>
       `;
@@ -246,7 +198,7 @@ async function loadVideos() {
 // ----------------------
 // Page load
 // ----------------------
-checkUser();
+initAuth();
 
 </script>
 </body>
