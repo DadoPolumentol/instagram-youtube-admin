@@ -64,11 +64,17 @@ async function checkUser() {
 document.getElementById("login").onclick = async () => {
   const { data, error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin, flowType: 'popup' }
+    options: { flowType: 'popup' } // <--- popup avoids redirect entirely
   });
 
-  if (error) console.log("Login error:", error);
+  if (error) {
+    console.log("Login error:", error);
+    alert("Login failed. See console.");
+  } else {
+    checkUser(); // immediately shows admin panel
+  }
 };
+
 
 // ----------------------
 // Logout button
