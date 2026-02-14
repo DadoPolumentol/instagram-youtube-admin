@@ -93,6 +93,22 @@ document.getElementById("submit").onclick = async () => {
 
   if (!link) { alert("Instagram link required"); return; }
 
+  // Check for duplicates
+  const { data: existing } = await supabaseClient
+    .from("queue")
+    .select("id, status")
+    .eq("link", link)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    const status = existing[0].status;
+    if (confirm(`This link was already submitted (status: ${status}). Submit again anyway?`)) {
+      // Continue
+    } else {
+      return;
+    }
+  }
+
   try {
     await supabaseClient.from("queue").insert([{
       link: link,
@@ -120,20 +136,34 @@ async function loadVideos() {
     const { data } = await supabaseClient
       .from("queue")
       .select("*")
-      .eq("status", "done")
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(20);
 
     const container = document.getElementById("videos");
     container.innerHTML = "";
 
     data.forEach(video => {
+      const scheduledTime = video.scheduled_publish_at 
+        ? new Date(video.scheduled_publish_at).toLocaleString() 
+        : "Not scheduled";
+      
+      const statusColor = {
+        'pending': 'orange',
+        'processing': 'blue',
+        'done': 'green',
+        'failed': 'red'
+      }[video.status] || 'gray';
+
       container.innerHTML += `
-        <div style="margin-bottom:10px;">
-          Instagram: <a href="${video.link}" target="_blank">View</a><br>
-          YouTube: ${video.youtube_video_id ? 
+        <div style="margin-bottom:15px; padding:10px; border-left: 4px solid ${statusColor};">
+          <strong>Status:</strong> <span style="color: ${statusColor}">${video.status}</span><br>
+          <strong>Instagram:</strong> <a href="${video.link}" target="_blank">View Reel</a><br>
+          <strong>YouTube:</strong> ${video.youtube_video_id ? 
             `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch</a>` 
-            : "Not uploaded yet"}
+            : "Not uploaded yet"}<br>
+          <strong>Scheduled:</strong> ${scheduledTime}<br>
+          ${video.error ? `<strong style="color:red">Error:</strong> ${video.error}<br>` : ''}
+          ${video.title ? `<strong>Title:</strong> ${video.title}<br>` : ''}
           <hr>
         </div>
       `;
