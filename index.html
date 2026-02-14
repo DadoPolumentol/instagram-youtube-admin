@@ -64,11 +64,14 @@ async function checkUser() {
 // Login button
 // ----------------------
 document.getElementById("login").onclick = async () => {
-  await supabase.auth.signInWithOAuth({ 
-    provider: "google",
-    options: { redirectTo: window.location.origin }
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin, flowType: 'popup' }
   });
+
+  if (error) console.log("Login error:", error);
 };
+
 
 // ----------------------
 // Logout button
