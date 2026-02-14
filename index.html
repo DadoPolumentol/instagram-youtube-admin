@@ -38,8 +38,16 @@ const ADMIN_EMAIL = "crazychannelprofessional@gmail.com";
 // Handle OAuth session on page load
 // ----------------------
 async function initAuth() {
-  const { data, error } = await supabaseClient.auth.getSessionFromUrl({ storeSession: true });
-  if (error) console.log("OAuth error:", error);
+  // Check if we're returning from OAuth redirect
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  if (hashParams.has('access_token')) {
+    // Clear the hash from URL
+    history.replaceState(null, '', window.location.pathname);
+  }
+  
+  // Get current session
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  
   checkUser();
 }
 
@@ -59,19 +67,32 @@ async function checkUser() {
 }
 
 // ----------------------
+// Detect if mobile device
+// ----------------------
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// ----------------------
 // Login button
 // ----------------------
 document.getElementById("login").onclick = async () => {
+  const isMobile = isMobileDevice();
+  
   const { data, error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
-    options: { flowType: 'popup' } // popup login, avoids redirect
+    options: { 
+      redirectTo: window.location.href, // redirect back to current page
+      ...(isMobile ? {} : { flowType: 'popup' }) // popup only on desktop
+    }
   });
 
   if (error) {
     console.log("Login error:", error);
-  } else {
-    checkUser(); // immediately show admin panel
+  } else if (!isMobile) {
+    checkUser(); // for popup flow, immediately check
   }
+  // For redirect flow (mobile), checkUser is called by initAuth on page load
 };
 
 
