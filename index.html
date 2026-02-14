@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Instagram → YouTube Admin</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -11,27 +12,42 @@
 <button id="login">Login with Google</button>
 <button id="logout">Logout</button>
 
-<div id="panel" style="display:none;">
+<div id="panel" style="display:none; margin-top: 20px;">
 
   <h3>Add Instagram Link</h3>
-  <input type="text" id="link" placeholder="Instagram URL">
-  <input type="text" id="title" placeholder="Optional Title">
-  <input type="text" id="description" placeholder="Optional Description">
+  <input type="text" id="link" placeholder="Instagram URL" style="width:300px;">
+  <input type="text" id="title" placeholder="Optional Title" style="width:200px;">
+  <input type="text" id="description" placeholder="Optional Description" style="width:200px;">
   <button id="submit">Submit</button>
 
   <h3>Last 10 Videos</h3>
-  <div id="videos"></div>
+  <div id="videos" style="margin-top:10px;"></div>
 
 </div>
 
 <script>
 const supabase = window.supabase.createClient(
-  "https://colyuvayzgcdifnuivnz.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM"
+  "https://colyuvayzgcdifnuivnz.supabase.co", // your Supabase URL
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM" // your anon key
 );
 
-const ADMIN_EMAIL = "crazychannelprofessional@gmail.com";
+const ADMIN_EMAIL = "crazychannelprofessional@gmail.com"; // only this Gmail can see panel
 
+// ----------------------
+// Handle OAuth session on page load
+// ----------------------
+async function initAuth() {
+  // Capture OAuth session if user just logged in via redirect
+  const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+  if (error) console.log("OAuth error:", error);
+
+  // Then check user
+  checkUser();
+}
+
+// ----------------------
+// Show or hide admin panel
+// ----------------------
 async function checkUser() {
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -44,21 +60,27 @@ async function checkUser() {
   }
 }
 
+// ----------------------
+// Login button
+// ----------------------
 document.getElementById("login").onclick = async () => {
   await supabase.auth.signInWithOAuth({ 
     provider: "google",
-    options: {
-      redirectTo: window.location.origin
-    }
+    options: { redirectTo: window.location.origin }
   });
 };
 
-
+// ----------------------
+// Logout button
+// ----------------------
 document.getElementById("logout").onclick = async () => {
   await supabase.auth.signOut();
   location.reload();
 };
 
+// ----------------------
+// Submit Instagram link
+// ----------------------
 document.getElementById("submit").onclick = async () => {
   const link = document.getElementById("link").value.trim();
   const title = document.getElementById("title").value.trim();
@@ -69,57 +91,61 @@ document.getElementById("submit").onclick = async () => {
     return;
   }
 
-  await supabase.from("queue").insert([{
-    link: link,
-    title: title || null,
-    description: description || null,
-    status: "pending"
-  }]);
+  try {
+    await supabase.from("queue").insert([{
+      link: link,
+      title: title || null,
+      description: description || null,
+      status: "pending"
+    }]);
 
-  alert("Inserted!");
-  document.getElementById("link").value = "";
-  document.getElementById("title").value = "";
-  document.getElementById("description").value = "";
-  loadVideos();
+    alert("Inserted!");
+    document.getElementById("link").value = "";
+    document.getElementById("title").value = "";
+    document.getElementById("description").value = "";
+    loadVideos();
+  } catch (err) {
+    console.log("Insert error:", err);
+    alert("Failed to insert link. Check console.");
+  }
 };
 
-async function initAuth() {
-  // Capture OAuth session if user just logged in
-  const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-  if (error) console.log("OAuth error:", error);
-
-  // Then check user normally
-  checkUser();
-}
-
-
+// ----------------------
+// Load last 10 done videos
+// ----------------------
 async function loadVideos() {
-  const { data } = await supabase
-    .from("queue")
-    .select("*")
-    .eq("status", "done")
-    .order("created_at", { ascending: false })
-    .limit(10);
+  try {
+    const { data } = await supabase
+      .from("queue")
+      .select("*")
+      .eq("status", "done")
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-  const container = document.getElementById("videos");
-  container.innerHTML = "";
+    const container = document.getElementById("videos");
+    container.innerHTML = "";
 
-  data.forEach(video => {
-    container.innerHTML += `
-      <div>
-        Instagram: <a href="${video.link}" target="_blank">View</a><br>
-        YouTube: ${video.youtube_video_id ? 
-          `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch</a>` 
-          : "Not uploaded yet"}
-        <hr>
-      </div>
-    `;
-  });
+    data.forEach(video => {
+      container.innerHTML += `
+        <div style="margin-bottom:10px;">
+          Instagram: <a href="${video.link}" target="_blank">View</a><br>
+          YouTube: ${video.youtube_video_id ? 
+            `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch</a>` 
+            : "Not uploaded yet"}
+          <hr>
+        </div>
+      `;
+    });
+  } catch (err) {
+    console.log("Load videos error:", err);
+  }
 }
 
-// Run on page load
+// ----------------------
+// Page load
+// ----------------------
 initAuth();
-</script>
 
+</script>
 </body>
 </html>
