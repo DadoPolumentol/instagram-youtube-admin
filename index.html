@@ -97,12 +97,61 @@ document.getElementById("login").onclick = async () => {
 
 
 // ----------------------
-// Logout button
+// Logout button - improved with full cleanup
 // ----------------------
 document.getElementById("logout").onclick = async () => {
   await supabaseClient.auth.signOut();
+  
+  // Clear all Supabase storage
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  // Clear URL hash if present
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname);
+  }
+  
   location.reload();
 };
+
+// ----------------------
+// Handle OAuth session on page load - with error handling
+// ----------------------
+async function initAuth() {
+  try {
+    // Check if we're returning from OAuth redirect
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    
+    // Check for OAuth errors in URL
+    if (hashParams.has('error')) {
+      console.log("OAuth error:", hashParams.get('error_description'));
+      // Clear the error from URL
+      history.replaceState(null, '', window.location.pathname);
+      
+      // Clear any stale auth data
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      alert("Login failed. Please try again.");
+      return;
+    }
+    
+    if (hashParams.has('access_token')) {
+      // Clear the hash from URL
+      history.replaceState(null, '', window.location.pathname);
+    }
+    
+    // Get current session
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    
+    checkUser();
+  } catch (error) {
+    console.log("Init auth error:", error);
+    // Clear storage on error
+    localStorage.clear();
+    sessionStorage.clear();
+  }
+}
 
 // ----------------------
 // Submit Instagram link
