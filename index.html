@@ -45,8 +45,14 @@ async function checkUser() {
 }
 
 document.getElementById("login").onclick = async () => {
-  await supabase.auth.signInWithOAuth({ provider: "google" });
+  await supabase.auth.signInWithOAuth({ 
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
 };
+
 
 document.getElementById("logout").onclick = async () => {
   await supabase.auth.signOut();
@@ -77,6 +83,16 @@ document.getElementById("submit").onclick = async () => {
   loadVideos();
 };
 
+async function initAuth() {
+  // Capture OAuth session if user just logged in
+  const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+  if (error) console.log("OAuth error:", error);
+
+  // Then check user normally
+  checkUser();
+}
+
+
 async function loadVideos() {
   const { data } = await supabase
     .from("queue")
@@ -102,7 +118,7 @@ async function loadVideos() {
 }
 
 // Run on page load
-checkUser();
+initAuth();
 </script>
 
 </body>
