@@ -26,22 +26,20 @@
 </div>
 
 <script>
-const supabase = window.supabase.createClient(
+// ✅ Fix: use a different variable name to avoid global conflict
+const supabaseClient = window.supabase.createClient(
   "https://colyuvayzgcdifnuivnz.supabase.co", // your Supabase URL
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM" // your anon key
 );
 
-const ADMIN_EMAIL = "crazychannelprofessional@gmail.com"; // only this Gmail can see panel
+const ADMIN_EMAIL = "crazychannelprofessional@gmail.com";
 
 // ----------------------
 // Handle OAuth session on page load
 // ----------------------
 async function initAuth() {
-  // Capture OAuth session if user just logged in via redirect
-  const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+  const { data, error } = await supabaseClient.auth.getSessionFromUrl({ storeSession: true });
   if (error) console.log("OAuth error:", error);
-
-  // Then check user
   checkUser();
 }
 
@@ -49,7 +47,7 @@ async function initAuth() {
 // Show or hide admin panel
 // ----------------------
 async function checkUser() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabaseClient.auth.getUser();
 
   if (user && user.email === ADMIN_EMAIL) {
     document.getElementById("panel").style.display = "block";
@@ -64,7 +62,7 @@ async function checkUser() {
 // Login button
 // ----------------------
 document.getElementById("login").onclick = async () => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin, flowType: 'popup' }
   });
@@ -72,12 +70,11 @@ document.getElementById("login").onclick = async () => {
   if (error) console.log("Login error:", error);
 };
 
-
 // ----------------------
 // Logout button
 // ----------------------
 document.getElementById("logout").onclick = async () => {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   location.reload();
 };
 
@@ -89,13 +86,10 @@ document.getElementById("submit").onclick = async () => {
   const title = document.getElementById("title").value.trim();
   const description = document.getElementById("description").value.trim();
 
-  if (!link) {
-    alert("Instagram link required");
-    return;
-  }
+  if (!link) { alert("Instagram link required"); return; }
 
   try {
-    await supabase.from("queue").insert([{
+    await supabaseClient.from("queue").insert([{
       link: link,
       title: title || null,
       description: description || null,
@@ -118,7 +112,7 @@ document.getElementById("submit").onclick = async () => {
 // ----------------------
 async function loadVideos() {
   try {
-    const { data } = await supabase
+    const { data } = await supabaseClient
       .from("queue")
       .select("*")
       .eq("status", "done")
