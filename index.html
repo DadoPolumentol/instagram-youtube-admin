@@ -47,35 +47,32 @@ function isMobileDevice() {
 // ----------------------
 async function initAuth() {
   try {
-    // Check if we're returning from OAuth redirect
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    // First, let Supabase process any OAuth callback in the URL
+    // This needs to happen BEFORE we clear the hash
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
     
-    // Check for OAuth errors in URL
-    if (hashParams.has('error')) {
-      console.log("OAuth error:", hashParams.get('error_description'));
-      // Clear the error from URL
-      history.replaceState(null, '', window.location.pathname);
-      
-      // Clear any stale auth data
+    if (error) {
+      console.log("Session error:", error);
+      alert("Login failed: " + error.message);
+      // Clear the hash on error
+      if (window.location.hash) {
+        history.replaceState(null, '', window.location.pathname);
+      }
       localStorage.clear();
       sessionStorage.clear();
-      
-      alert("Login failed. Please try again.");
       return;
     }
     
-    if (hashParams.has('access_token')) {
-      // Clear the hash from URL
+    // NOW we can clear the hash from URL (after Supabase processed it)
+    if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
     }
     
-    // Get current session
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    
+    // Check if user is authorized
     checkUser();
+    
   } catch (error) {
     console.log("Init auth error:", error);
-    // Clear storage on error
     localStorage.clear();
     sessionStorage.clear();
   }
@@ -105,13 +102,14 @@ document.getElementById("login").onclick = async () => {
   const { data, error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
     options: { 
-      redirectTo: window.location.href,
       ...(isMobile ? {} : { flowType: 'popup' })
+      // redirectTo is automatic - it goes back to current page
     }
   });
 
   if (error) {
     console.log("Login error:", error);
+    alert("Login error: " + error.message);
   } else if (!isMobile) {
     checkUser();
   }
