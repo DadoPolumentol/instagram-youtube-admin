@@ -126,7 +126,16 @@
 
   <button id="submit" style="margin-top: 20px;">Submit Job</button>
 
-  <h3>Queue Status (Last 20 Jobs)</h3>
+  <h3>Queue Status (Last 10 Jobs)</h3>
+  <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+    <button id="refreshQueue" style="background-color: #2196F3; color: white;">
+      🔄 Refresh Queue
+    </button>
+    <button id="cleanupOld" style="background-color: #ff9800; color: white;">
+      🗑️ Cleanup Old Records (30+ days)
+    </button>
+    <span id="cleanupStatus" style="font-size: 12px; color: #666;"></span>
+  </div>
   <div id="videos" style="margin-top:10px;"></div>
 
 </div>
@@ -153,18 +162,14 @@ function isMobileDevice() {
 async function initAuth() {
   try {
     // First, let Supabase process any OAuth callback in the URL
-    // This needs to happen BEFORE we clear the hash
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     
     if (error) {
       console.log("Session error:", error);
-      alert("Login failed: " + error.message);
-      // Clear the hash on error
+      // Clear the hash on error (don't alert - silent fail)
       if (window.location.hash) {
         history.replaceState(null, '', window.location.pathname);
       }
-      localStorage.clear();
-      sessionStorage.clear();
       return;
     }
     
@@ -178,8 +183,6 @@ async function initAuth() {
     
   } catch (error) {
     console.log("Init auth error:", error);
-    localStorage.clear();
-    sessionStorage.clear();
   }
 }
 
@@ -298,7 +301,84 @@ document.getElementById("submit").onclick = async () => {
 };
 
 // ----------------------
-// Load last 20 jobs from queue
+// Refresh queue button
+// ----------------------
+document.getElementById("refreshQueue").onclick = () => {
+  loadVideos();
+};
+
+// ----------------------
+// Cleanup old records button
+// ----------------------
+document.getElementById("cleanupOld").onclick = async () => {
+  const statusEl = document.getElementById("cleanupStatus");
+  
+  // Calculate date 30 days ago
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoffDate = thirtyDaysAgo.toISOString();
+  
+  try {
+    // First, count how many records would be deleted
+    const { data: toDelete, error: countError } = await supabaseClient
+      .from("queue")
+      .select("id", { count: 'exact', head: true })
+      .eq("status", "done")
+      .lt("created_at", cutoffDate);
+    
+    if (countError) {
+      statusEl.textContent = "❌ Error counting records";
+      statusEl.style.color = "red";
+      return;
+    }
+    
+    const count = toDelete?.length || 0;
+    
+    if (count === 0) {
+      statusEl.textContent = "✓ No old records to delete";
+      statusEl.style.color = "green";
+      return;
+    }
+    
+    // Confirm deletion
+    const confirmed = confirm(`Delete ${count} records older than 30 days with status "done"?`);
+    if (!confirmed) {
+      statusEl.textContent = "Cancelled";
+      statusEl.style.color = "#666";
+      return;
+    }
+    
+    // Delete the records
+    const { error: deleteError } = await supabaseClient
+      .from("queue")
+      .delete()
+      .eq("status", "done")
+      .lt("created_at", cutoffDate);
+    
+    if (deleteError) {
+      statusEl.textContent = "❌ Delete failed: " + deleteError.message;
+      statusEl.style.color = "red";
+      console.log("Delete error:", deleteError);
+    } else {
+      statusEl.textContent = `✓ Deleted ${count} old records`;
+      statusEl.style.color = "green";
+      loadVideos();  // Refresh the list
+      
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        statusEl.textContent = "";
+      }, 5000);
+    }
+    
+  } catch (err) {
+    statusEl.textContent = "❌ Error: " + err.message;
+    statusEl.style.color = "red";
+    console.log("Cleanup error:", err);
+  }
+};
+
+// ----------------------
+// Load last 10 jobs from queue
 // ----------------------
 async function loadVideos() {
   try {
@@ -306,7 +386,7 @@ async function loadVideos() {
       .from("queue")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(10);  // Changed from 20 to 10
 
     const container = document.getElementById("videos");
     container.innerHTML = "";
