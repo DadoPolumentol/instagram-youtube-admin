@@ -4,24 +4,129 @@
   <meta charset="UTF-8">
   <title>Instagram → YouTube Admin</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 800px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="text"], select {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #login, #submit {
+      background-color: #4CAF50;
+      color: white;
+    }
+    #logout {
+      background-color: #666;
+      color: white;
+    }
+    #clearAuth {
+      background-color: #dc3545;
+      color: white;
+    }
+    .video-editor-section {
+      background-color: #f0f8ff;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      border: 2px solid #4CAF50;
+    }
+    .video-editor-section h4 {
+      margin-top: 0;
+      color: #2e7d32;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .checkbox-group input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    .helper-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 3px;
+    }
+  </style>
 </head>
 <body>
 
-<h2>Admin Panel</h2>
+<h2>Instagram → YouTube Admin</h2>
 
 <button id="login">Login with Google</button>
 <button id="logout">Logout</button>
-<button id="clearAuth" style="background-color: #dc3545; color: white;">Clear Auth & Retry</button>
+<button id="clearAuth">Clear Auth & Retry</button>
 
 <div id="panel" style="display:none; margin-top: 20px;">
 
   <h3>Add Instagram Link</h3>
-  <input type="text" id="link" placeholder="Instagram URL" style="width:300px;">
-  <input type="text" id="title" placeholder="Optional Title" style="width:200px;">
-  <input type="text" id="description" placeholder="Optional Description" style="width:200px;">
-  <button id="submit">Submit</button>
+  
+  <div class="form-group">
+    <label for="link">Instagram URL *</label>
+    <input type="text" id="link" placeholder="https://www.instagram.com/reel/..." style="width:100%; max-width:500px;">
+  </div>
 
-  <h3>Last 10 Videos</h3>
+  <div class="form-group">
+    <label for="title">Custom Title (Optional)</label>
+    <input type="text" id="title" placeholder="Leave empty to use caption" style="width:100%; max-width:500px;">
+  </div>
+
+  <div class="form-group">
+    <label for="description">Custom Description (Optional)</label>
+    <input type="text" id="description" placeholder="Leave empty to use caption" style="width:100%; max-width:500px;">
+  </div>
+
+  <!-- NEW: Video Editing Section -->
+  <div class="video-editor-section">
+    <h4>✨ Video Editing (AI-Powered)</h4>
+    
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="checkbox" id="enable_editing" checked>
+        <label for="enable_editing" style="margin-bottom: 0;">Enable AI hooks & subtitles</label>
+      </div>
+      <div class="helper-text">
+        Adds AI-generated hook at the start + professional subtitles throughout the video
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="subtitle_position">Subtitle Position</label>
+      <select id="subtitle_position" style="width: 200px;">
+        <option value="bottom" selected>Bottom (Default)</option>
+        <option value="center">Center</option>
+        <option value="top">Top</option>
+      </select>
+      <div class="helper-text">
+        Choose where subtitles appear on the video
+      </div>
+    </div>
+  </div>
+
+  <button id="submit" style="margin-top: 20px;">Submit Job</button>
+
+  <h3>Queue Status (Last 20 Jobs)</h3>
   <div id="videos" style="margin-top:10px;"></div>
 
 </div>
@@ -150,27 +255,41 @@ document.getElementById("clearAuth").onclick = () => {
 };
 
 // ----------------------
-// Submit Instagram link
+// Submit Instagram link with video editing options
 // ----------------------
 document.getElementById("submit").onclick = async () => {
   const link = document.getElementById("link").value.trim();
   const title = document.getElementById("title").value.trim();
   const description = document.getElementById("description").value.trim();
+  
+  // NEW: Get video editing options
+  const enable_editing = document.getElementById("enable_editing").checked;
+  const subtitle_position = document.getElementById("subtitle_position").value;
 
-  if (!link) { alert("Instagram link required"); return; }
+  if (!link) { 
+    alert("Instagram link required"); 
+    return; 
+  }
 
   try {
     await supabaseClient.from("queue").insert([{
       link: link,
       title: title || null,
       description: description || null,
-      status: "pending"
+      status: "pending",
+      enable_editing: enable_editing,        // NEW
+      subtitle_position: subtitle_position   // NEW
     }]);
 
-    alert("Inserted!");
+    alert("Job submitted successfully!");
+    
+    // Clear form
     document.getElementById("link").value = "";
     document.getElementById("title").value = "";
     document.getElementById("description").value = "";
+    document.getElementById("enable_editing").checked = true;  // Reset to default
+    document.getElementById("subtitle_position").value = "bottom";  // Reset to default
+    
     loadVideos();
   } catch (err) {
     console.log("Insert error:", err);
@@ -179,7 +298,7 @@ document.getElementById("submit").onclick = async () => {
 };
 
 // ----------------------
-// Load last 10 done videos
+// Load last 20 jobs from queue
 // ----------------------
 async function loadVideos() {
   try {
@@ -191,6 +310,11 @@ async function loadVideos() {
 
     const container = document.getElementById("videos");
     container.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      container.innerHTML = "<p>No jobs in queue yet.</p>";
+      return;
+    }
 
     data.forEach(video => {
       const scheduledTime = video.scheduled_publish_at 
@@ -204,22 +328,29 @@ async function loadVideos() {
         'failed': 'red'
       }[video.status] || 'gray';
 
+      // NEW: Show editing status
+      const editingStatus = video.enable_editing 
+        ? `✅ Editing enabled (${video.subtitle_position || 'bottom'})` 
+        : '⏭️ Editing disabled';
+
       container.innerHTML += `
-        <div style="margin-bottom:15px; padding:10px; border-left: 4px solid ${statusColor};">
-          <strong>Status:</strong> <span style="color: ${statusColor}">${video.status}</span><br>
+        <div style="margin-bottom:15px; padding:15px; border-left: 4px solid ${statusColor}; background-color: #f9f9f9;">
+          <strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${video.status}</span><br>
           <strong>Instagram:</strong> <a href="${video.link}" target="_blank">View Reel</a><br>
           <strong>YouTube:</strong> ${video.youtube_video_id ? 
-            `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch</a>` 
-            : "Not uploaded yet"}<br>
+            `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch Video</a>` 
+            : "<span style='color: #999;'>Not uploaded yet</span>"}<br>
           <strong>Scheduled:</strong> ${scheduledTime}<br>
-          ${video.error ? `<strong style="color:red">Error:</strong> ${video.error}<br>` : ''}
+          <strong>Video Editing:</strong> ${editingStatus}<br>
           ${video.title ? `<strong>Title:</strong> ${video.title}<br>` : ''}
-          <hr>
+          ${video.error ? `<strong style="color:red">Error:</strong> ${video.error}<br>` : ''}
+          <small style="color: #666;">Created: ${new Date(video.created_at).toLocaleString()}</small>
         </div>
       `;
     });
   } catch (err) {
     console.log("Load videos error:", err);
+    document.getElementById("videos").innerHTML = "<p style='color:red;'>Error loading jobs</p>";
   }
 }
 
