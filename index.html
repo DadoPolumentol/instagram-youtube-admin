@@ -80,63 +80,96 @@
 
 <div id="panel" style="display:none; margin-top: 20px;">
 
-  <h3>Add Instagram Link</h3>
-  
-  <div class="form-group">
-    <label for="link">Instagram URL *</label>
-    <input type="text" id="link" placeholder="https://www.instagram.com/reel/..." style="width:100%; max-width:500px;">
+  <!-- Toggle buttons for different sections -->
+  <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+    <button id="toggleInstagram" style="background-color: #E1306C; color: white;">📸 Instagram Reels</button>
+    <button id="toggleAIShorts" style="background-color: #4CAF50; color: white;">🤖 AI Story Shorts</button>
   </div>
 
-  <div class="form-group">
-    <label for="title">Custom Title (Optional)</label>
-    <input type="text" id="title" placeholder="Leave empty to use caption" style="width:100%; max-width:500px;">
-  </div>
-
-  <div class="form-group">
-    <label for="description">Custom Description (Optional)</label>
-    <input type="text" id="description" placeholder="Leave empty to use caption" style="width:100%; max-width:500px;">
-  </div>
-
-  <!-- NEW: Video Editing Section -->
-  <div class="video-editor-section">
-    <h4>✨ Video Editing (AI-Powered)</h4>
+  <!-- SECTION 1: Instagram Reels (existing) -->
+  <div id="instagramSection" style="display:none;">
+    <h3>Add Instagram Link</h3>
     
     <div class="form-group">
-      <div class="checkbox-group">
-        <input type="checkbox" id="enable_editing" checked>
-        <label for="enable_editing" style="margin-bottom: 0;">Enable AI hooks & subtitles</label>
-      </div>
-      <div class="helper-text">
-        Adds AI-generated hook at the start + professional subtitles throughout the video
-      </div>
+      <label for="link">Instagram URL *</label>
+      <input type="text" id="link" placeholder="https://www.instagram.com/reel/..." style="width:100%; max-width:500px;">
     </div>
 
     <div class="form-group">
-      <label for="subtitle_position">Subtitle Position</label>
-      <select id="subtitle_position" style="width: 200px;">
-        <option value="bottom" selected>Bottom (Default)</option>
-        <option value="center">Center</option>
-        <option value="top">Top</option>
-      </select>
-      <div class="helper-text">
-        Choose where subtitles appear on the video
+      <label for="title">Custom Title (Optional)</label>
+      <input type="text" id="title" placeholder="Leave empty to use caption" style="width:100%; max-width:500px;">
+    </div>
+
+    <div class="form-group">
+      <label for="description">Custom Description (Optional)</label>
+      <input type="text" id="description" placeholder="Leave empty to use caption" style="width:100%; max-width:500px;">
+    </div>
+
+    <!-- Video Editing Section -->
+    <div class="video-editor-section">
+      <h4>✨ Video Editing (AI-Powered)</h4>
+      
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="enable_editing" checked>
+          <label for="enable_editing" style="margin-bottom: 0;">Enable AI hooks & subtitles</label>
+        </div>
+        <div class="helper-text">
+          Adds AI-generated hook at the start + professional subtitles throughout the video
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="subtitle_position">Subtitle Position</label>
+        <select id="subtitle_position" style="width: 200px;">
+          <option value="bottom" selected>Bottom (Default)</option>
+          <option value="center">Center</option>
+          <option value="top">Top</option>
+        </select>
+        <div class="helper-text">
+          Choose where subtitles appear on the video
+        </div>
       </div>
     </div>
+
+    <button id="submit" style="margin-top: 20px;">Submit Job</button>
+
+    <h3>Queue Status (Last 10 Jobs)</h3>
+    <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+      <button id="refreshQueue" style="background-color: #2196F3; color: white;">
+        🔄 Refresh Queue
+      </button>
+      <button id="cleanupOld" style="background-color: #ff9800; color: white;">
+        🗑️ Cleanup Old Records (30+ days)
+      </button>
+      <span id="cleanupStatus" style="font-size: 12px; color: #666;"></span>
+    </div>
+    <div id="videos" style="margin-top:10px;"></div>
   </div>
 
-  <button id="submit" style="margin-top: 20px;">Submit Job</button>
+  <!-- SECTION 2: AI Story Shorts (NEW) -->
+  <div id="aiShortsSection" style="display:none;">
+    <h3>🤖 Generate AI Story Short</h3>
+    
+    <div class="form-group">
+      <label for="aiTopic">Story Topic (Optional)</label>
+      <input type="text" id="aiTopic" placeholder="e.g., family betrayal, workplace revenge, etc. (leave empty for random)" style="width:100%; max-width:500px;">
+      <div class="helper-text">
+        Leave empty to let AI choose a compelling story topic
+      </div>
+    </div>
 
-  <h3>Queue Status (Last 10 Jobs)</h3>
-  <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-    <button id="refreshQueue" style="background-color: #2196F3; color: white;">
-      🔄 Refresh Queue
-    </button>
-    <button id="cleanupOld" style="background-color: #ff9800; color: white;">
-      🗑️ Cleanup Old Records (30+ days)
-    </button>
-    <span id="cleanupStatus" style="font-size: 12px; color: #666;"></span>
+    <button id="submitAIShort" style="background-color: #4CAF50; color: white; margin-top: 20px;">✨ Generate Short</button>
+
+    <h3>AI Shorts Queue (Last 10 Jobs)</h3>
+    <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+      <button id="refreshAIQueue" style="background-color: #2196F3; color: white;">
+        🔄 Refresh Queue
+      </button>
+      <span id="aiStatus" style="font-size: 12px; color: #666;"></span>
+    </div>
+    <div id="aiVideos" style="margin-top:10px;"></div>
   </div>
-  <div id="videos" style="margin-top:10px;"></div>
 
 </div>
 
@@ -301,6 +334,43 @@ document.getElementById("submit").onclick = async () => {
 };
 
 // ----------------------
+// Section toggling
+// ----------------------
+document.getElementById("toggleInstagram").onclick = () => {
+  document.getElementById("instagramSection").style.display = "block";
+  document.getElementById("aiShortsSection").style.display = "none";
+};
+
+document.getElementById("toggleAIShorts").onclick = () => {
+  document.getElementById("instagramSection").style.display = "none";
+  document.getElementById("aiShortsSection").style.display = "block";
+};
+
+// Default: show AI Shorts section
+document.getElementById("aiShortsSection").style.display = "block";
+
+// ----------------------
+// Submit AI Short
+// ----------------------
+document.getElementById("submitAIShort").onclick = async () => {
+  const topic = document.getElementById("aiTopic").value.trim();
+  
+  try {
+    await supabaseClient.from("ai_shorts_queue").insert([{
+      topic: topic || null,
+      status: "pending"
+    }]);
+
+    alert("AI Short job submitted!");
+    document.getElementById("aiTopic").value = "";
+    loadAIVideos();
+  } catch (err) {
+    console.log("Insert error:", err);
+    alert("Failed to submit job. Check console.");
+  }
+};
+
+// ----------------------
 // Refresh queue button
 // ----------------------
 document.getElementById("refreshQueue").onclick = () => {
@@ -431,6 +501,64 @@ async function loadVideos() {
   } catch (err) {
     console.log("Load videos error:", err);
     document.getElementById("videos").innerHTML = "<p style='color:red;'>Error loading jobs</p>";
+  }
+}
+
+// ----------------------
+// Refresh AI queue button
+// ----------------------
+document.getElementById("refreshAIQueue").onclick = () => {
+  loadAIVideos();
+};
+
+// ----------------------
+// Load AI shorts queue
+// ----------------------
+async function loadAIVideos() {
+  try {
+    const { data } = await supabaseClient
+      .from("ai_shorts_queue")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const container = document.getElementById("aiVideos");
+    container.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      container.innerHTML = "<p>No AI shorts in queue yet.</p>";
+      return;
+    }
+
+    data.forEach(video => {
+      const scheduledTime = video.scheduled_publish_at 
+        ? new Date(video.scheduled_publish_at).toLocaleString() 
+        : "Not scheduled";
+      
+      const statusColor = {
+        'pending': 'orange',
+        'processing': 'blue',
+        'done': 'green',
+        'failed': 'red'
+      }[video.status] || 'gray';
+
+      container.innerHTML += `
+        <div style="margin-bottom:15px; padding:15px; border-left: 4px solid ${statusColor}; background-color: #f9f9f9;">
+          <strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${video.status}</span><br>
+          ${video.topic ? `<strong>Topic:</strong> ${video.topic}<br>` : '<strong>Topic:</strong> Random (AI chosen)<br>'}
+          ${video.title ? `<strong>Title:</strong> ${video.title}<br>` : ''}
+          <strong>YouTube:</strong> ${video.youtube_video_id ? 
+            `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch Video</a>` 
+            : "<span style='color: #999;'>Not uploaded yet</span>"}<br>
+          <strong>Scheduled:</strong> ${scheduledTime}<br>
+          ${video.error ? `<strong style="color:red">Error:</strong> ${video.error}<br>` : ''}
+          <small style="color: #666;">Created: ${new Date(video.created_at).toLocaleString()}</small>
+        </div>
+      `;
+    });
+  } catch (err) {
+    console.log("Load AI videos error:", err);
+    document.getElementById("aiVideos").innerHTML = "<p style='color:red;'>Error loading jobs</p>";
   }
 }
 
