@@ -18,10 +18,16 @@
       margin-bottom: 5px;
       font-weight: bold;
     }
-    input[type="text"], select {
+    input[type="text"], select, textarea {
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
+    }
+    textarea {
+      width: 100%;
+      max-width: 500px;
+      min-height: 100px;
+      font-family: inherit;
     }
     button {
       padding: 10px 20px;
@@ -68,6 +74,31 @@
       color: #666;
       margin-top: 3px;
     }
+    .file-upload-area {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      background-color: #f9f9f9;
+    }
+    .file-upload-area:hover {
+      border-color: #4CAF50;
+      background-color: #f0f8ff;
+    }
+    .preview-image {
+      max-width: 300px;
+      margin-top: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .fetched-content {
+      background-color: #f0f8ff;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      border: 2px solid #2196F3;
+    }
   </style>
 </head>
 <body>
@@ -81,9 +112,11 @@
 <div id="panel" style="display:none; margin-top: 20px;">
 
   <!-- Toggle buttons for different sections -->
-  <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+  <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
     <button id="toggleInstagram" style="background-color: #E1306C; color: white;">📸 Instagram Reels</button>
     <button id="toggleAIShorts" style="background-color: #4CAF50; color: white;">🤖 AI Story Shorts</button>
+    <button id="toggleRedditBroll" style="background-color: #FF4500; color: white;">📥 Reddit B-roll</button>
+    <button id="toggleRedditShorts" style="background-color: #FF8C00; color: white;">📝 Reddit Shorts</button>
   </div>
 
   <!-- SECTION 1: Instagram Reels (existing) -->
@@ -147,7 +180,7 @@
     <div id="videos" style="margin-top:10px;"></div>
   </div>
 
-  <!-- SECTION 2: AI Story Shorts (NEW) -->
+  <!-- SECTION 2: AI Story Shorts -->
   <div id="aiShortsSection" style="display:none;">
     <h3>🤖 Generate AI Story Short</h3>
     
@@ -171,16 +204,104 @@
     <div id="aiVideos" style="margin-top:10px;"></div>
   </div>
 
+  <!-- SECTION 3: Reddit B-roll Download (NEW) -->
+  <div id="redditBrollSection" style="display:none;">
+    <h3>📥 Download Reddit Video as B-roll</h3>
+    
+    <div class="form-group">
+      <label for="redditBrollUrl">Reddit Post URL *</label>
+      <input type="text" id="redditBrollUrl" placeholder="https://www.reddit.com/r/funny/comments/..." style="width:100%; max-width:500px;">
+      <div class="helper-text">
+        Paste a Reddit post URL that contains a video. The video will be downloaded and saved as B-roll.
+      </div>
+    </div>
+
+    <button id="downloadRedditBroll" style="background-color: #FF4500; color: white; margin-top: 20px;">📥 Download as B-roll</button>
+    
+    <div id="brollDownloadStatus" style="margin-top: 15px; font-size: 14px;"></div>
+
+    <h3>Available B-rolls</h3>
+    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+      <button id="refreshBrolls" style="background-color: #2196F3; color: white;">
+        🔄 Refresh List
+      </button>
+    </div>
+    <div id="brollList" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- SECTION 4: Reddit Shorts Creation (NEW) -->
+  <div id="redditShortsSection" style="display:none;">
+    <h3>📝 Create Reddit Short (Manual Curation)</h3>
+    
+    <div class="form-group">
+      <label for="redditPostUrl">Reddit Post URL *</label>
+      <input type="text" id="redditPostUrl" placeholder="https://www.reddit.com/r/AskReddit/comments/..." style="width:100%; max-width:500px;">
+      <div class="helper-text">
+        Paste a Reddit post URL. We'll fetch the title and content for you to edit.
+      </div>
+    </div>
+
+    <button id="fetchRedditPost" style="background-color: #2196F3; color: white;">🔍 Fetch Post</button>
+
+    <!-- Fetched content (hidden until fetched) -->
+    <div id="fetchedContent" class="fetched-content" style="display:none;">
+      <h4 style="margin-top: 0;">✅ Post Fetched - Edit Below</h4>
+      
+      <div class="form-group">
+        <label for="redditTitle">Title (will be spoken by TTS)</label>
+        <input type="text" id="redditTitle" style="width:100%; max-width:500px;">
+      </div>
+
+      <div class="form-group">
+        <label for="redditDescription">Description (will be spoken by TTS)</label>
+        <textarea id="redditDescription"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="redditCardFile">Upload Custom Reddit Card PNG</label>
+        <div class="file-upload-area" id="cardUploadArea">
+          <input type="file" id="redditCardFile" accept="image/png,image/jpg,image/jpeg" style="display:none;">
+          <p>📤 Click to upload custom Reddit card image</p>
+          <small style="color: #666;">Will be overlaid on B-roll (no card generation)</small>
+        </div>
+        <img id="cardPreview" class="preview-image" style="display:none;">
+      </div>
+
+      <div class="form-group">
+        <label for="brollSelect">Select B-roll *</label>
+        <select id="brollSelect" style="width:100%; max-width:500px;">
+          <option value="">Select a B-roll video...</option>
+        </select>
+        <div class="helper-text">
+          Choose from downloaded Reddit B-roll videos
+        </div>
+      </div>
+
+      <button id="submitRedditShort" style="background-color: #FF8C00; color: white; margin-top: 20px;">🚀 Create Video</button>
+    </div>
+
+    <h3>Reddit Shorts Queue (Last 10 Jobs)</h3>
+    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+      <button id="refreshRedditQueue" style="background-color: #2196F3; color: white;">
+        🔄 Refresh Queue
+      </button>
+    </div>
+    <div id="redditVideos" style="margin-top:10px;"></div>
+  </div>
+
 </div>
 
 <script>
-// ✅ Fix: use a different variable name to avoid global conflict
+// Supabase client
 const supabaseClient = window.supabase.createClient(
   "https://colyuvayzgcdifnuivnz.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbHl1dmF5emdjZGlmbnVpdm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5ODk1MDMsImV4cCI6MjA4NjU2NTUwM30.tDiCCUp5uBH7j05QP-Yy_0rwF7mqxMVPaoQViYEl2MM"
 );
 
 const ADMIN_EMAIL = "crazychannelprofessional@gmail.com";
+
+// State for uploaded card file
+let uploadedCardFile = null;
 
 // ----------------------
 // Detect if mobile device
@@ -190,28 +311,24 @@ function isMobileDevice() {
 }
 
 // ----------------------
-// Handle OAuth session on page load - with error handling
+// Handle OAuth session on page load
 // ----------------------
 async function initAuth() {
   try {
-    // First, let Supabase process any OAuth callback in the URL
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     
     if (error) {
       console.log("Session error:", error);
-      // Clear the hash on error (don't alert - silent fail)
       if (window.location.hash) {
         history.replaceState(null, '', window.location.pathname);
       }
       return;
     }
     
-    // NOW we can clear the hash from URL (after Supabase processed it)
     if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
     }
     
-    // Check if user is authorized
     checkUser();
     
   } catch (error) {
@@ -243,30 +360,24 @@ document.getElementById("login").onclick = async () => {
   const { data, error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
     options: { 
-      redirectTo: 'https://dadopolumentol.github.io/instagram-youtube-admin/', // Always redirect to full path
+      redirectTo: 'https://dadopolumentol.github.io/instagram-youtube-admin/',
       ...(isMobile ? {} : { flowType: 'popup' })
     }
   });
 
   if (error) {
     console.log("Login error:", error);
-    alert("Login error: " + error.message);
-  } else if (!isMobile) {
-    checkUser();
+    alert("Login failed - check console");
   }
 };
 
 // ----------------------
-// Logout button - improved with full cleanup
+// Logout button
 // ----------------------
 document.getElementById("logout").onclick = async () => {
   await supabaseClient.auth.signOut();
+  document.getElementById("panel").style.display = "none";
   
-  // Clear all Supabase storage
-  localStorage.clear();
-  sessionStorage.clear();
-  
-  // Clear URL hash if present
   if (window.location.hash) {
     history.replaceState(null, '', window.location.pathname);
   }
@@ -274,31 +385,24 @@ document.getElementById("logout").onclick = async () => {
   location.reload();
 };
 
-
 // ----------------------
 // Clear Auth button
 // ----------------------
 document.getElementById("clearAuth").onclick = () => {
-  // Nuclear option - clear everything
   localStorage.clear();
   sessionStorage.clear();
-  
-  // Clear URL
   history.replaceState(null, '', window.location.pathname + window.location.search);
-  
   alert("Auth data cleared. Click Login to try again.");
   location.reload();
 };
 
 // ----------------------
-// Submit Instagram link with video editing options
+// Submit Instagram link
 // ----------------------
 document.getElementById("submit").onclick = async () => {
   const link = document.getElementById("link").value.trim();
   const title = document.getElementById("title").value.trim();
   const description = document.getElementById("description").value.trim();
-  
-  // NEW: Get video editing options
   const enable_editing = document.getElementById("enable_editing").checked;
   const subtitle_position = document.getElementById("subtitle_position").value;
 
@@ -313,18 +417,17 @@ document.getElementById("submit").onclick = async () => {
       title: title || null,
       description: description || null,
       status: "pending",
-      enable_editing: enable_editing,        // NEW
-      subtitle_position: subtitle_position   // NEW
+      enable_editing: enable_editing,
+      subtitle_position: subtitle_position
     }]);
 
     alert("Job submitted successfully!");
     
-    // Clear form
     document.getElementById("link").value = "";
     document.getElementById("title").value = "";
     document.getElementById("description").value = "";
-    document.getElementById("enable_editing").checked = true;  // Reset to default
-    document.getElementById("subtitle_position").value = "bottom";  // Reset to default
+    document.getElementById("enable_editing").checked = true;
+    document.getElementById("subtitle_position").value = "bottom";
     
     loadVideos();
   } catch (err) {
@@ -337,14 +440,35 @@ document.getElementById("submit").onclick = async () => {
 // Section toggling
 // ----------------------
 document.getElementById("toggleInstagram").onclick = () => {
+  hideAllSections();
   document.getElementById("instagramSection").style.display = "block";
-  document.getElementById("aiShortsSection").style.display = "none";
 };
 
 document.getElementById("toggleAIShorts").onclick = () => {
-  document.getElementById("instagramSection").style.display = "none";
+  hideAllSections();
   document.getElementById("aiShortsSection").style.display = "block";
+  loadAIVideos();
 };
+
+document.getElementById("toggleRedditBroll").onclick = () => {
+  hideAllSections();
+  document.getElementById("redditBrollSection").style.display = "block";
+  loadBrolls();
+};
+
+document.getElementById("toggleRedditShorts").onclick = () => {
+  hideAllSections();
+  document.getElementById("redditShortsSection").style.display = "block";
+  loadRedditQueue();
+  loadBrollsForSelect();
+};
+
+function hideAllSections() {
+  document.getElementById("instagramSection").style.display = "none";
+  document.getElementById("aiShortsSection").style.display = "none";
+  document.getElementById("redditBrollSection").style.display = "none";
+  document.getElementById("redditShortsSection").style.display = "none";
+}
 
 // Default: show AI Shorts section
 document.getElementById("aiShortsSection").style.display = "block";
@@ -358,7 +482,8 @@ document.getElementById("submitAIShort").onclick = async () => {
   try {
     await supabaseClient.from("ai_shorts_queue").insert([{
       topic: topic || null,
-      status: "pending"
+      status: "pending",
+      source: "ai_generated"
     }]);
 
     alert("AI Short job submitted!");
@@ -371,92 +496,178 @@ document.getElementById("submitAIShort").onclick = async () => {
 };
 
 // ----------------------
-// Refresh queue button
+// Download Reddit B-roll
 // ----------------------
-document.getElementById("refreshQueue").onclick = () => {
-  loadVideos();
-};
-
-// ----------------------
-// Cleanup old records button
-// ----------------------
-document.getElementById("cleanupOld").onclick = async () => {
-  const statusEl = document.getElementById("cleanupStatus");
+document.getElementById("downloadRedditBroll").onclick = async () => {
+  const url = document.getElementById("redditBrollUrl").value.trim();
+  const statusEl = document.getElementById("brollDownloadStatus");
   
-  // Calculate date 30 days ago
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cutoffDate = thirtyDaysAgo.toISOString();
+  if (!url) {
+    alert("Reddit URL required");
+    return;
+  }
+  
+  statusEl.innerHTML = '<span style="color: blue;">⏳ Downloading video from Reddit...</span>';
   
   try {
-    // First, count how many records would be deleted
-    const { data: toDelete, error: countError } = await supabaseClient
-      .from("queue")
-      .select("id", { count: 'exact', head: true })
-      .eq("status", "done")
-      .lt("created_at", cutoffDate);
+    // Call backend API to download Reddit video
+    const response = await fetch('http://localhost:5000/api/download-reddit-broll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
     
-    if (countError) {
-      statusEl.textContent = "❌ Error counting records";
-      statusEl.style.color = "red";
-      return;
-    }
+    const result = await response.json();
     
-    const count = toDelete?.length || 0;
-    
-    if (count === 0) {
-      statusEl.textContent = "✓ No old records to delete";
-      statusEl.style.color = "green";
-      return;
-    }
-    
-    // Confirm deletion
-    const confirmed = confirm(`Delete ${count} records older than 30 days with status "done"?`);
-    if (!confirmed) {
-      statusEl.textContent = "Cancelled";
-      statusEl.style.color = "#666";
-      return;
-    }
-    
-    // Delete the records
-    const { error: deleteError } = await supabaseClient
-      .from("queue")
-      .delete()
-      .eq("status", "done")
-      .lt("created_at", cutoffDate);
-    
-    if (deleteError) {
-      statusEl.textContent = "❌ Delete failed: " + deleteError.message;
-      statusEl.style.color = "red";
-      console.log("Delete error:", deleteError);
+    if (response.ok) {
+      statusEl.innerHTML = `<span style="color: green;">✅ Downloaded: ${result.filename} (${result.duration}s)</span>`;
+      document.getElementById("redditBrollUrl").value = "";
+      loadBrolls();
     } else {
-      statusEl.textContent = `✓ Deleted ${count} old records`;
-      statusEl.style.color = "green";
-      loadVideos();  // Refresh the list
-      
-      // Clear status after 5 seconds
-      setTimeout(() => {
-        statusEl.textContent = "";
-      }, 5000);
+      statusEl.innerHTML = `<span style="color: red;">❌ Error: ${result.error}</span>`;
     }
-    
-  } catch (err) {
-    statusEl.textContent = "❌ Error: " + err.message;
-    statusEl.style.color = "red";
-    console.log("Cleanup error:", err);
+  } catch (error) {
+    statusEl.innerHTML = `<span style="color: red;">❌ Failed to download: ${error.message}</span>`;
   }
 };
 
 // ----------------------
-// Load last 10 jobs from queue
+// Fetch Reddit Post (client-side using Unofficial Reddit API)
 // ----------------------
+document.getElementById("fetchRedditPost").onclick = async () => {
+  const url = document.getElementById("redditPostUrl").value.trim();
+  
+  if (!url) {
+    alert("Reddit URL required");
+    return;
+  }
+  
+  try {
+    // Use Unofficial Reddit API
+    const apiUrl = `https://reddit-unofficial-api.glitch.me/api/${encodeURIComponent(url)}`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    
+    if (!data || data.error) {
+      alert(`Failed to fetch post: ${data.error || 'Unknown error'}`);
+      return;
+    }
+    
+    // Populate fields
+    document.getElementById("redditTitle").value = data.title || '';
+    document.getElementById("redditDescription").value = data.selftext || '';
+    
+    // Show fetched content section
+    document.getElementById("fetchedContent").style.display = "block";
+    
+  } catch (error) {
+    alert(`Failed to fetch post: ${error.message}`);
+  }
+};
+
+// ----------------------
+// Card file upload
+// ----------------------
+document.getElementById("cardUploadArea").onclick = () => {
+  document.getElementById("redditCardFile").click();
+};
+
+document.getElementById("redditCardFile").onchange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    uploadedCardFile = file;
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const preview = document.getElementById("cardPreview");
+      preview.src = e.target.result;
+      preview.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+// ----------------------
+// Submit Reddit Short
+// ----------------------
+document.getElementById("submitRedditShort").onclick = async () => {
+  const title = document.getElementById("redditTitle").value.trim();
+  const description = document.getElementById("redditDescription").value.trim();
+  const brollFilename = document.getElementById("brollSelect").value;
+  const redditUrl = document.getElementById("redditPostUrl").value.trim();
+  
+  if (!title || !brollFilename) {
+    alert("Title and B-roll are required");
+    return;
+  }
+  
+  try {
+    // If card file is uploaded, we need to upload it to Supabase Storage first
+    let customCardUrl = null;
+    
+    if (uploadedCardFile) {
+      const filename = `reddit_card_${Date.now()}.png`;
+      const { data, error } = await supabaseClient.storage
+        .from('reddit-cards')
+        .upload(filename, uploadedCardFile);
+      
+      if (error) {
+        console.log("Card upload error:", error);
+        alert("Failed to upload card. Continuing without it...");
+      } else {
+        const { data: { publicUrl } } = supabaseClient.storage
+          .from('reddit-cards')
+          .getPublicUrl(filename);
+        customCardUrl = publicUrl;
+      }
+    }
+    
+    // Insert job
+    await supabaseClient.from("ai_shorts_queue").insert([{
+      title: title,
+      script: description,
+      reddit_url: redditUrl,
+      broll_filename: brollFilename,
+      custom_card_url: customCardUrl,
+      source: "reddit_manual",
+      status: "pending"
+    }]);
+    
+    alert("Reddit Short job submitted!");
+    
+    // Reset form
+    document.getElementById("redditTitle").value = "";
+    document.getElementById("redditDescription").value = "";
+    document.getElementById("redditPostUrl").value = "";
+    document.getElementById("redditCardFile").value = "";
+    document.getElementById("cardPreview").style.display = "none";
+    document.getElementById("fetchedContent").style.display = "none";
+    uploadedCardFile = null;
+    
+    loadRedditQueue();
+  } catch (err) {
+    console.log("Insert error:", err);
+    alert("Failed to submit job. Check console.");
+  }
+};
+
+// ----------------------
+// Load functions
+// ----------------------
+document.getElementById("refreshQueue").onclick = () => loadVideos();
+document.getElementById("refreshAIQueue").onclick = () => loadAIVideos();
+document.getElementById("refreshBrolls").onclick = () => loadBrolls();
+document.getElementById("refreshRedditQueue").onclick = () => loadRedditQueue();
+
+// Load Instagram queue (existing)
 async function loadVideos() {
   try {
     const { data } = await supabaseClient
       .from("queue")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(10);  // Changed from 20 to 10
+      .limit(10);
 
     const container = document.getElementById("videos");
     container.innerHTML = "";
@@ -478,7 +689,6 @@ async function loadVideos() {
         'failed': 'red'
       }[video.status] || 'gray';
 
-      // NEW: Show editing status
       const editingStatus = video.enable_editing 
         ? `✅ Editing enabled (${video.subtitle_position || 'bottom'})` 
         : '⏭️ Editing disabled';
@@ -504,16 +714,7 @@ async function loadVideos() {
   }
 }
 
-// ----------------------
-// Refresh AI queue button
-// ----------------------
-document.getElementById("refreshAIQueue").onclick = () => {
-  loadAIVideos();
-};
-
-// ----------------------
 // Load AI shorts queue
-// ----------------------
 async function loadAIVideos() {
   try {
     const { data } = await supabaseClient
@@ -541,11 +742,13 @@ async function loadAIVideos() {
         'done': 'green',
         'failed': 'red'
       }[video.status] || 'gray';
+      
+      const sourceLabel = video.source === 'reddit_manual' ? '📝 Reddit' : '🤖 AI';
 
       container.innerHTML += `
         <div style="margin-bottom:15px; padding:15px; border-left: 4px solid ${statusColor}; background-color: #f9f9f9;">
-          <strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${video.status}</span><br>
-          ${video.topic ? `<strong>Topic:</strong> ${video.topic}<br>` : '<strong>Topic:</strong> Random (AI chosen)<br>'}
+          <strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${video.status}</span> ${sourceLabel}<br>
+          ${video.topic ? `<strong>Topic:</strong> ${video.topic}<br>` : ''}
           ${video.title ? `<strong>Title:</strong> ${video.title}<br>` : ''}
           <strong>YouTube:</strong> ${video.youtube_video_id ? 
             `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch Video</a>` 
@@ -561,6 +764,176 @@ async function loadAIVideos() {
     document.getElementById("aiVideos").innerHTML = "<p style='color:red;'>Error loading jobs</p>";
   }
 }
+
+// Load B-roll list
+async function loadBrolls() {
+  try {
+    const { data } = await supabaseClient
+      .from("reddit_broll")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const container = document.getElementById("brollList");
+    container.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      container.innerHTML = "<p>No B-rolls downloaded yet.</p>";
+      return;
+    }
+
+    data.forEach(broll => {
+      container.innerHTML += `
+        <div style="margin-bottom:10px; padding:12px; background-color: #f9f9f9; border-radius: 4px;">
+          <strong>${broll.filename}</strong><br>
+          <small>Duration: ${broll.duration_seconds}s | Size: ${broll.file_size_mb}MB | Used: ${broll.times_used}x</small><br>
+          <small style="color: #666;">${new Date(broll.created_at).toLocaleString()}</small>
+        </div>
+      `;
+    });
+  } catch (err) {
+    console.log("Load B-rolls error:", err);
+    document.getElementById("brollList").innerHTML = "<p style='color:red;'>Error loading B-rolls</p>";
+  }
+}
+
+// Load B-rolls for dropdown
+async function loadBrollsForSelect() {
+  try {
+    const { data } = await supabaseClient
+      .from("reddit_broll")
+      .select("filename, duration_seconds")
+      .order("created_at", { ascending: false });
+
+    const select = document.getElementById("brollSelect");
+    select.innerHTML = '<option value="">Select a B-roll video...</option>';
+
+    if (data && data.length > 0) {
+      data.forEach(broll => {
+        select.innerHTML += `<option value="${broll.filename}">${broll.filename} (${broll.duration_seconds}s)</option>`;
+      });
+    }
+  } catch (err) {
+    console.log("Load B-rolls for select error:", err);
+  }
+}
+
+// Load Reddit shorts queue (shows both AI and Reddit shorts from same table)
+async function loadRedditQueue() {
+  try {
+    const { data } = await supabaseClient
+      .from("ai_shorts_queue")
+      .select("*")
+      .eq("source", "reddit_manual")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const container = document.getElementById("redditVideos");
+    container.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      container.innerHTML = "<p>No Reddit shorts in queue yet.</p>";
+      return;
+    }
+
+    data.forEach(video => {
+      const scheduledTime = video.scheduled_publish_at 
+        ? new Date(video.scheduled_publish_at).toLocaleString() 
+        : "Not scheduled";
+      
+      const statusColor = {
+        'pending': 'orange',
+        'processing': 'blue',
+        'done': 'green',
+        'failed': 'red'
+      }[video.status] || 'gray';
+
+      container.innerHTML += `
+        <div style="margin-bottom:15px; padding:15px; border-left: 4px solid ${statusColor}; background-color: #f9f9f9;">
+          <strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${video.status}</span><br>
+          <strong>Title:</strong> ${video.title}<br>
+          ${video.reddit_url ? `<strong>Reddit:</strong> <a href="${video.reddit_url}" target="_blank">View Post</a><br>` : ''}
+          <strong>B-roll:</strong> ${video.broll_filename || 'N/A'}<br>
+          <strong>Custom Card:</strong> ${video.custom_card_url ? 'Yes ✓' : 'No (generated)'}<br>
+          <strong>YouTube:</strong> ${video.youtube_video_id ? 
+            `<a href="https://youtube.com/watch?v=${video.youtube_video_id}" target="_blank">Watch Video</a>` 
+            : "<span style='color: #999;'>Not uploaded yet</span>"}<br>
+          <strong>Scheduled:</strong> ${scheduledTime}<br>
+          ${video.error ? `<strong style="color:red">Error:</strong> ${video.error}<br>` : ''}
+          <small style="color: #666;">Created: ${new Date(video.created_at).toLocaleString()}</small>
+        </div>
+      `;
+    });
+  } catch (err) {
+    console.log("Load Reddit queue error:", err);
+    document.getElementById("redditVideos").innerHTML = "<p style='color:red;'>Error loading jobs</p>";
+  }
+}
+
+// ----------------------
+// Cleanup old records button (Instagram)
+// ----------------------
+document.getElementById("cleanupOld").onclick = async () => {
+  const statusEl = document.getElementById("cleanupStatus");
+  
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoffDate = thirtyDaysAgo.toISOString();
+  
+  try {
+    const { data: toDelete, error: countError } = await supabaseClient
+      .from("queue")
+      .select("id", { count: 'exact', head: true })
+      .eq("status", "done")
+      .lt("created_at", cutoffDate);
+    
+    if (countError) {
+      statusEl.textContent = "❌ Error counting records";
+      statusEl.style.color = "red";
+      return;
+    }
+    
+    const count = toDelete?.length || 0;
+    
+    if (count === 0) {
+      statusEl.textContent = "✓ No old records to delete";
+      statusEl.style.color = "green";
+      return;
+    }
+    
+    const confirmed = confirm(`Delete ${count} records older than 30 days with status "done"?`);
+    if (!confirmed) {
+      statusEl.textContent = "Cancelled";
+      statusEl.style.color = "#666";
+      return;
+    }
+    
+    const { error: deleteError } = await supabaseClient
+      .from("queue")
+      .delete()
+      .eq("status", "done")
+      .lt("created_at", cutoffDate);
+    
+    if (deleteError) {
+      statusEl.textContent = "❌ Delete failed: " + deleteError.message;
+      statusEl.style.color = "red";
+      console.log("Delete error:", deleteError);
+    } else {
+      statusEl.textContent = `✓ Deleted ${count} old records`;
+      statusEl.style.color = "green";
+      loadVideos();
+      
+      setTimeout(() => {
+        statusEl.textContent = "";
+      }, 5000);
+    }
+    
+  } catch (err) {
+    statusEl.textContent = "❌ Error: " + err.message;
+    statusEl.style.color = "red";
+    console.log("Cleanup error:", err);
+  }
+};
 
 // ----------------------
 // Page load
