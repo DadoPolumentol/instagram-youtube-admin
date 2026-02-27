@@ -199,6 +199,9 @@
       <button id="refreshAIQueue" style="background-color: #2196F3; color: white;">
         🔄 Refresh Queue
       </button>
+      <button id="cleanupAIQueue" style="background-color: #ff9800; color: white;">
+        🗑️ Delete Records Older Than 10
+      </button>
       <span id="aiStatus" style="font-size: 12px; color: #666;"></span>
     </div>
     <div id="aiVideos" style="margin-top:10px;"></div>
@@ -285,6 +288,10 @@
       <button id="refreshRedditQueue" style="background-color: #2196F3; color: white;">
         🔄 Refresh Queue
       </button>
+      <button id="cleanupRedditQueue" style="background-color: #ff9800; color: white;">
+        🗑️ Delete Records Older Than 10
+      </button>
+      <span id="redditStatus" style="font-size: 12px; color: #666;"></span>
     </div>
     <div id="redditVideos" style="margin-top:10px;"></div>
   </div>
@@ -532,7 +539,7 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
 };
 
 // ----------------------
-// Fetch Reddit Post (client-side using Unofficial Reddit API)
+// Fetch Reddit Post (client-side using Reddit's JSON API)
 // ----------------------
 document.getElementById("fetchRedditPost").onclick = async () => {
   const url = document.getElementById("redditPostUrl").value.trim();
@@ -543,25 +550,33 @@ document.getElementById("fetchRedditPost").onclick = async () => {
   }
   
   try {
-    // Use Unofficial Reddit API
-    const apiUrl = `https://reddit-unofficial-api.glitch.me/api/${encodeURIComponent(url)}`;
-    const response = await fetch(apiUrl);
-    const data = await response.json();
+    // Reddit's native JSON API - just add .json to the URL
+    const jsonUrl = url.replace(/\/$/, '') + '.json';
     
-    if (!data || data.error) {
-      alert(`Failed to fetch post: ${data.error || 'Unknown error'}`);
-      return;
+    const response = await fetch(jsonUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
+    const data = await response.json();
+    
+    // Extract post data from Reddit's JSON structure
+    // data is an array: [0] = post, [1] = comments
+    const post = data[0].data.children[0].data;
+    
     // Populate fields
-    document.getElementById("redditTitle").value = data.title || '';
-    document.getElementById("redditDescription").value = data.selftext || '';
+    document.getElementById("redditTitle").value = post.title || '';
+    document.getElementById("redditDescription").value = post.selftext || '';
     
     // Show fetched content section
     document.getElementById("fetchedContent").style.display = "block";
     
+    alert("✅ Post fetched successfully!");
+    
   } catch (error) {
-    alert(`Failed to fetch post: ${error.message}`);
+    console.error("Fetch error:", error);
+    alert(`Failed to fetch post: ${error.message}\n\nMake sure the URL is a direct link to a Reddit post.`);
   }
 };
 
@@ -932,6 +947,117 @@ document.getElementById("cleanupOld").onclick = async () => {
     statusEl.textContent = "❌ Error: " + err.message;
     statusEl.style.color = "red";
     console.log("Cleanup error:", err);
+  }
+};
+
+// ----------------------
+// Cleanup AI Shorts Queue (delete all but last 10)
+// ----------------------
+document.getElementById("cleanupAIQueue").onclick = async () => {
+  const statusEl = document.getElementById("aiStatus");
+  
+  try {
+    // Get all AI shorts ordered by creation date
+    const { data: allJobs } = await supabaseClient
+      .from("ai_shorts_queue")
+      .select("id")
+      .order("created_at", { ascending: false });
+    
+    if (!allJobs || allJobs.length <= 10) {
+      statusEl.textContent = "✓ No old records to delete (10 or fewer total)";
+      statusEl.style.color = "green";
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+      return;
+    }
+    
+    // Get IDs to delete (everything after the first 10)
+    const idsToDelete = allJobs.slice(10).map(job => job.id);
+    
+    const confirmed = confirm(`Delete ${idsToDelete.length} old records (keep last 10)?`);
+    if (!confirmed) {
+      statusEl.textContent = "Cancelled";
+      statusEl.style.color = "#666";
+      setTimeout(() => { statusEl.textContent = ""; }, 3000);
+      return;
+    }
+    
+    // Delete old records
+    const { error } = await supabaseClient
+      .from("ai_shorts_queue")
+      .delete()
+      .in("id", idsToDelete);
+    
+    if (error) {
+      statusEl.textContent = "❌ Delete failed";
+      statusEl.style.color = "red";
+      console.error("Delete error:", error);
+    } else {
+      statusEl.textContent = `✓ Deleted ${idsToDelete.length} old records`;
+      statusEl.style.color = "green";
+      loadAIVideos();
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+    }
+    
+  } catch (err) {
+    statusEl.textContent = "❌ Error: " + err.message;
+    statusEl.style.color = "red";
+    console.error("Cleanup error:", err);
+  }
+};
+
+// ----------------------
+// Cleanup Reddit Shorts Queue (delete all but last 10)
+// ----------------------
+document.getElementById("cleanupRedditQueue").onclick = async () => {
+  const statusEl = document.getElementById("redditStatus");
+  
+  try {
+    // Get all Reddit shorts ordered by creation date
+    const { data: allJobs } = await supabaseClient
+      .from("ai_shorts_queue")
+      .select("id")
+      .eq("source", "reddit_manual")
+      .order("created_at", { ascending: false });
+    
+    if (!allJobs || allJobs.length <= 10) {
+      statusEl.textContent = "✓ No old records to delete (10 or fewer total)";
+      statusEl.style.color = "green";
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+      return;
+    }
+    
+    // Get IDs to delete (everything after the first 10)
+    const idsToDelete = allJobs.slice(10).map(job => job.id);
+    
+    const confirmed = confirm(`Delete ${idsToDelete.length} old records (keep last 10)?`);
+    if (!confirmed) {
+      statusEl.textContent = "Cancelled";
+      statusEl.style.color = "#666";
+      setTimeout(() => { statusEl.textContent = ""; }, 3000);
+      return;
+    }
+    
+    // Delete old records
+    const { error } = await supabaseClient
+      .from("ai_shorts_queue")
+      .delete()
+      .in("id", idsToDelete);
+    
+    if (error) {
+      statusEl.textContent = "❌ Delete failed";
+      statusEl.style.color = "red";
+      console.error("Delete error:", error);
+    } else {
+      statusEl.textContent = `✓ Deleted ${idsToDelete.length} old records`;
+      statusEl.style.color = "green";
+      loadRedditQueue();
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+    }
+    
+  } catch (err) {
+    statusEl.textContent = "❌ Error: " + err.message;
+    statusEl.style.color = "red";
+    console.error("Cleanup error:", err);
   }
 };
 
