@@ -539,7 +539,7 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
 };
 
 // ----------------------
-// Fetch Reddit Post (client-side using Reddit's JSON API)
+// Fetch Reddit Post (via backend API - handles mobile share links)
 // ----------------------
 document.getElementById("fetchRedditPost").onclick = async () => {
   const url = document.getElementById("redditPostUrl").value.trim();
@@ -550,24 +550,23 @@ document.getElementById("fetchRedditPost").onclick = async () => {
   }
   
   try {
-    // Reddit's native JSON API - just add .json to the URL
-    const jsonUrl = url.replace(/\/$/, '') + '.json';
-    
-    const response = await fetch(jsonUrl);
+    // Call backend API to fetch post (handles mobile share links)
+    const response = await fetch('http://localhost:5000/api/fetch-reddit-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
     
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch');
     }
     
     const data = await response.json();
     
-    // Extract post data from Reddit's JSON structure
-    // data is an array: [0] = post, [1] = comments
-    const post = data[0].data.children[0].data;
-    
     // Populate fields
-    document.getElementById("redditTitle").value = post.title || '';
-    document.getElementById("redditDescription").value = post.selftext || '';
+    document.getElementById("redditTitle").value = data.title || '';
+    document.getElementById("redditDescription").value = data.description || '';
     
     // Show fetched content section
     document.getElementById("fetchedContent").style.display = "block";
@@ -576,7 +575,7 @@ document.getElementById("fetchRedditPost").onclick = async () => {
     
   } catch (error) {
     console.error("Fetch error:", error);
-    alert(`Failed to fetch post: ${error.message}\n\nMake sure the URL is a direct link to a Reddit post.`);
+    alert(`Failed to fetch post: ${error.message}\n\nMake sure:\n1. API is running (python reddit_api.py)\n2. URL is a valid Reddit post link`);
   }
 };
 
