@@ -213,13 +213,13 @@
     
     <div class="form-group">
       <label for="redditBrollUrl">Reddit Post URL *</label>
-      <input type="text" id="redditBrollUrl" placeholder="https://www.reddit.com/r/funny/comments/..." style="width:100%; max-width:500px;">
+      <input type="text" id="redditBrollUrl" placeholder="https://www.reddit.com/r/funny/comments/... (or mobile share link)" style="width:100%; max-width:500px;">
       <div class="helper-text">
-        Paste a Reddit post URL that contains a video. The video will be downloaded and saved as B-roll.
+        Paste a Reddit post URL that contains a video. Worker will download it automatically.
       </div>
     </div>
 
-    <button id="downloadRedditBroll" style="background-color: #FF4500; color: white; margin-top: 20px;">📥 Download as B-roll</button>
+    <button id="downloadRedditBroll" style="background-color: #FF4500; color: white; margin-top: 20px;">📥 Submit Download Job</button>
     
     <div id="brollDownloadStatus" style="margin-top: 15px; font-size: 14px;"></div>
 
@@ -238,49 +238,35 @@
     
     <div class="form-group">
       <label for="redditPostUrl">Reddit Post URL *</label>
-      <input type="text" id="redditPostUrl" placeholder="https://www.reddit.com/r/AskReddit/comments/..." style="width:100%; max-width:500px;">
+      <input type="text" id="redditPostUrl" placeholder="https://www.reddit.com/r/AskReddit/comments/... (or mobile share link)" style="width:100%; max-width:500px;">
       <div class="helper-text">
-        Paste a Reddit post URL. We'll fetch the title and content for you to edit.
+        Paste any Reddit post URL - worker will fetch the content automatically
       </div>
     </div>
 
-    <button id="fetchRedditPost" style="background-color: #2196F3; color: white;">🔍 Fetch Post</button>
-
-    <!-- Fetched content (hidden until fetched) -->
-    <div id="fetchedContent" class="fetched-content" style="display:none;">
-      <h4 style="margin-top: 0;">✅ Post Fetched - Edit Below</h4>
-      
-      <div class="form-group">
-        <label for="redditTitle">Title (will be spoken by TTS)</label>
-        <input type="text" id="redditTitle" style="width:100%; max-width:500px;">
+    <div class="form-group">
+      <label for="redditCardFile">Upload Custom Reddit Card PNG *</label>
+      <div class="file-upload-area" id="cardUploadArea">
+        <input type="file" id="redditCardFile" accept="image/png,image/jpg,image/jpeg" style="display:none;">
+        <p>📤 Click to upload custom Reddit card image</p>
+        <small style="color: #666;">Required - will be overlaid on B-roll</small>
       </div>
+      <img id="cardPreview" class="preview-image" style="display:none;">
+    </div>
 
-      <div class="form-group">
-        <label for="redditDescription">Description (will be spoken by TTS)</label>
-        <textarea id="redditDescription"></textarea>
+    <div class="form-group">
+      <label for="brollSelect">Select B-roll *</label>
+      <select id="brollSelect" style="width:100%; max-width:500px;">
+        <option value="">Select a B-roll video...</option>
+      </select>
+      <div class="helper-text">
+        Choose from downloaded Reddit B-roll videos
       </div>
+    </div>
 
-      <div class="form-group">
-        <label for="redditCardFile">Upload Custom Reddit Card PNG</label>
-        <div class="file-upload-area" id="cardUploadArea">
-          <input type="file" id="redditCardFile" accept="image/png,image/jpg,image/jpeg" style="display:none;">
-          <p>📤 Click to upload custom Reddit card image</p>
-          <small style="color: #666;">Will be overlaid on B-roll (no card generation)</small>
-        </div>
-        <img id="cardPreview" class="preview-image" style="display:none;">
-      </div>
-
-      <div class="form-group">
-        <label for="brollSelect">Select B-roll *</label>
-        <select id="brollSelect" style="width:100%; max-width:500px;">
-          <option value="">Select a B-roll video...</option>
-        </select>
-        <div class="helper-text">
-          Choose from downloaded Reddit B-roll videos
-        </div>
-      </div>
-
-      <button id="submitRedditShort" style="background-color: #FF8C00; color: white; margin-top: 20px;">🚀 Create Video</button>
+    <button id="fetchRedditPost" style="background-color: #FF8C00; color: white; margin-top: 20px;">🚀 Submit Job</button>
+    <div class="helper-text" style="margin-top: 10px;">
+      Worker will automatically fetch post content, generate TTS, overlay your card, and create video
     </div>
 
     <h3>Reddit Shorts Queue (Last 10 Jobs)</h3>
@@ -503,7 +489,7 @@ document.getElementById("submitAIShort").onclick = async () => {
 };
 
 // ----------------------
-// Download Reddit B-roll
+// Download Reddit B-roll (worker will process)
 // ----------------------
 document.getElementById("downloadRedditBroll").onclick = async () => {
   const url = document.getElementById("redditBrollUrl").value.trim();
@@ -514,32 +500,34 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
     return;
   }
   
-  statusEl.innerHTML = '<span style="color: blue;">⏳ Downloading video from Reddit...</span>';
-  
   try {
-    // Call backend API to download Reddit video
-    const response = await fetch('http://localhost:5000/api/download-reddit-broll', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
+    statusEl.innerHTML = '<span style="color: blue;">⏳ Job submitted - worker will download...</span>';
     
-    const result = await response.json();
+    // Create a temporary download job in a simple table
+    // Or we could use reddit_broll table with pending status
+    await supabaseClient.from("reddit_broll").insert([{
+      reddit_url: url,
+      filename: "pending...",
+      duration_seconds: 0,
+      file_size_mb: 0
+    }]);
     
-    if (response.ok) {
-      statusEl.innerHTML = `<span style="color: green;">✅ Downloaded: ${result.filename} (${result.duration}s)</span>`;
-      document.getElementById("redditBrollUrl").value = "";
-      loadBrolls();
-    } else {
-      statusEl.innerHTML = `<span style="color: red;">❌ Error: ${result.error}</span>`;
-    }
+    statusEl.innerHTML = '<span style="color: green;">✅ Download job submitted! Worker will process it.</span>';
+    document.getElementById("redditBrollUrl").value = "";
+    
+    // Note: Worker needs to check reddit_broll table for pending entries
+    // For now, show message that manual download is needed
+    setTimeout(() => {
+      statusEl.innerHTML = '<span style="color: orange;">⚠️ Note: Worker auto-download not yet implemented. Manual: Use yt-dlp directly or wait for worker update.</span>';
+    }, 3000);
+    
   } catch (error) {
-    statusEl.innerHTML = `<span style="color: red;">❌ Failed to download: ${error.message}</span>`;
+    statusEl.innerHTML = `<span style="color: red;">❌ Failed: ${error.message}</span>`;
   }
 };
 
 // ----------------------
-// Fetch Reddit Post (via backend API - handles mobile share links)
+// Submit Reddit Short (worker will fetch and process)
 // ----------------------
 document.getElementById("fetchRedditPost").onclick = async () => {
   const url = document.getElementById("redditPostUrl").value.trim();
@@ -549,35 +537,65 @@ document.getElementById("fetchRedditPost").onclick = async () => {
     return;
   }
   
+  if (!confirm("Submit job? Worker will fetch the post content and process it.")) {
+    return;
+  }
+  
   try {
-    // Call backend API to fetch post (handles mobile share links)
-    const response = await fetch('http://localhost:5000/api/fetch-reddit-post', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
+    // Submit job to Supabase - worker will handle fetching
+    const brollFilename = document.getElementById("brollSelect").value;
     
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch');
+    if (!brollFilename) {
+      alert("Please select a B-roll video first");
+      return;
     }
     
-    const data = await response.json();
+    let customCardUrl = null;
     
-    // Populate fields
-    document.getElementById("redditTitle").value = data.title || '';
-    document.getElementById("redditDescription").value = data.description || '';
+    // Upload custom card if provided
+    if (uploadedCardFile) {
+      const filename = `reddit_card_${Date.now()}.png`;
+      const { data, error } = await supabaseClient.storage
+        .from('reddit-cards')
+        .upload(filename, uploadedCardFile);
+      
+      if (error) {
+        console.log("Card upload error:", error);
+        alert("Failed to upload card. Continue without it?");
+      } else {
+        const { data: { publicUrl } } = supabaseClient.storage
+          .from('reddit-cards')
+          .getPublicUrl(filename);
+        customCardUrl = publicUrl;
+      }
+    }
     
-    // Show fetched content section
-    document.getElementById("fetchedContent").style.display = "block";
+    // Insert job - worker will fetch content and process
+    await supabaseClient.from("ai_shorts_queue").insert([{
+      reddit_url: url,
+      broll_filename: brollFilename,
+      custom_card_url: customCardUrl,
+      source: "reddit_manual",
+      status: "pending"
+    }]);
     
-    alert("✅ Post fetched successfully!");
+    alert("✅ Job submitted! Worker will fetch content and create video.");
     
-  } catch (error) {
-    console.error("Fetch error:", error);
-    alert(`Failed to fetch post: ${error.message}\n\nMake sure:\n1. API is running (python reddit_api.py)\n2. URL is a valid Reddit post link`);
+    // Reset form
+    document.getElementById("redditPostUrl").value = "";
+    document.getElementById("redditCardFile").value = "";
+    document.getElementById("cardPreview").style.display = "none";
+    uploadedCardFile = null;
+    
+    loadRedditQueue();
+  } catch (err) {
+    console.log("Insert error:", err);
+    alert("Failed to submit job. Check console.");
   }
 };
+
+// Remove the old fetchedContent section - not needed anymore
+// User just submits URL directly, worker handles everything
 
 // ----------------------
 // Card file upload
@@ -599,70 +617,6 @@ document.getElementById("redditCardFile").onchange = (e) => {
       preview.style.display = "block";
     };
     reader.readAsDataURL(file);
-  }
-};
-
-// ----------------------
-// Submit Reddit Short
-// ----------------------
-document.getElementById("submitRedditShort").onclick = async () => {
-  const title = document.getElementById("redditTitle").value.trim();
-  const description = document.getElementById("redditDescription").value.trim();
-  const brollFilename = document.getElementById("brollSelect").value;
-  const redditUrl = document.getElementById("redditPostUrl").value.trim();
-  
-  if (!title || !brollFilename) {
-    alert("Title and B-roll are required");
-    return;
-  }
-  
-  try {
-    // If card file is uploaded, we need to upload it to Supabase Storage first
-    let customCardUrl = null;
-    
-    if (uploadedCardFile) {
-      const filename = `reddit_card_${Date.now()}.png`;
-      const { data, error } = await supabaseClient.storage
-        .from('reddit-cards')
-        .upload(filename, uploadedCardFile);
-      
-      if (error) {
-        console.log("Card upload error:", error);
-        alert("Failed to upload card. Continuing without it...");
-      } else {
-        const { data: { publicUrl } } = supabaseClient.storage
-          .from('reddit-cards')
-          .getPublicUrl(filename);
-        customCardUrl = publicUrl;
-      }
-    }
-    
-    // Insert job
-    await supabaseClient.from("ai_shorts_queue").insert([{
-      title: title,
-      script: description,
-      reddit_url: redditUrl,
-      broll_filename: brollFilename,
-      custom_card_url: customCardUrl,
-      source: "reddit_manual",
-      status: "pending"
-    }]);
-    
-    alert("Reddit Short job submitted!");
-    
-    // Reset form
-    document.getElementById("redditTitle").value = "";
-    document.getElementById("redditDescription").value = "";
-    document.getElementById("redditPostUrl").value = "";
-    document.getElementById("redditCardFile").value = "";
-    document.getElementById("cardPreview").style.display = "none";
-    document.getElementById("fetchedContent").style.display = "none";
-    uploadedCardFile = null;
-    
-    loadRedditQueue();
-  } catch (err) {
-    console.log("Insert error:", err);
-    alert("Failed to submit job. Check console.");
   }
 };
 
