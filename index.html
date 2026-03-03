@@ -489,7 +489,7 @@ document.getElementById("submitAIShort").onclick = async () => {
 };
 
 // ----------------------
-// Download Reddit B-roll (worker will process)
+// Download Reddit B-roll (submit job for worker to process)
 // ----------------------
 document.getElementById("downloadRedditBroll").onclick = async () => {
   const url = document.getElementById("redditBrollUrl").value.trim();
@@ -501,25 +501,23 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
   }
   
   try {
-    statusEl.innerHTML = '<span style="color: blue;">⏳ Job submitted - worker will download...</span>';
+    statusEl.innerHTML = '<span style="color: blue;">⏳ Submitting download job...</span>';
     
-    // Create a temporary download job in a simple table
-    // Or we could use reddit_broll table with pending status
+    // Insert into reddit_broll with special "pending" marker
+    // Worker will check for entries with 0 duration and download them
     await supabaseClient.from("reddit_broll").insert([{
       reddit_url: url,
-      filename: "pending...",
-      duration_seconds: 0,
+      filename: "pending_download",
+      duration_seconds: 0,  // 0 = pending download
       file_size_mb: 0
     }]);
     
     statusEl.innerHTML = '<span style="color: green;">✅ Download job submitted! Worker will process it.</span>';
     document.getElementById("redditBrollUrl").value = "";
     
-    // Note: Worker needs to check reddit_broll table for pending entries
-    // For now, show message that manual download is needed
     setTimeout(() => {
-      statusEl.innerHTML = '<span style="color: orange;">⚠️ Note: Worker auto-download not yet implemented. Manual: Use yt-dlp directly or wait for worker update.</span>';
-    }, 3000);
+      loadBrolls();
+    }, 2000);
     
   } catch (error) {
     statusEl.innerHTML = `<span style="color: red;">❌ Failed: ${error.message}</span>`;
