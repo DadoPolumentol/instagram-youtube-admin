@@ -257,7 +257,7 @@
 
     <button id="fetchRedditPost" style="background-color: #FF8C00; color: white; margin-top: 20px;">📥 Fetch Content</button>
     <div class="helper-text" style="margin-top: 10px;">
-      Worker will fetch the content for you to review
+      After submitting, wait ~10 seconds then click "Refresh Queue & Fetched Jobs" below
     </div>
 
     <h3 style="margin-top: 40px;">📋 Step 2: Review & Edit Fetched Content</h3>
@@ -268,7 +268,7 @@
     <h3>Reddit Shorts Queue (Last 10 Jobs)</h3>
     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
       <button id="refreshRedditQueue" style="background-color: #2196F3; color: white;">
-        🔄 Refresh Queue
+        🔄 Refresh Queue & Fetched Jobs
       </button>
       <button id="cleanupRedditQueue" style="background-color: #ff9800; color: white;">
         🗑️ Delete Records Older Than 10
@@ -632,11 +632,9 @@ document.getElementById("fetchRedditPost").onclick = async () => {
       status: "pending"
     }]);
     
-    alert("✅ Job submitted! Worker will fetch the content.\n\nCheck 'Review & Edit' section below.");
+    alert("✅ Job submitted!\n\nClick 'Refresh Queue & Fetched Jobs' button below after ~10 seconds to see the fetched content.");
     
     document.getElementById("redditPostUrl").value = "";
-    
-    setTimeout(loadFetchedJobs, 2000);
     loadRedditQueue();
   } catch (err) {
     console.log("Insert error:", err);
@@ -797,31 +795,18 @@ async function deleteRedditJob(jobId) {
   }
 }
 
-// Auto-refresh fetched jobs every 10 seconds (only if no input is focused)
-setInterval(() => {
-  if (document.getElementById("redditShortsSection").style.display !== "none") {
-    // Don't refresh if user is currently editing
-    const activeElement = document.activeElement;
-    const isEditing = activeElement && (
-      activeElement.tagName === 'INPUT' || 
-      activeElement.tagName === 'TEXTAREA' ||
-      activeElement.id.startsWith('edit-')
-    );
-    
-    if (!isEditing) {
-      loadFetchedJobs();
-    }
-  }
-}, 10000);  // Changed to 10 seconds and only when not editing
+// Manual refresh button for fetched jobs
+document.getElementById("refreshRedditQueue").onclick = () => {
+  loadRedditQueue();
+  loadFetchedJobs();
+};
 
-// Remove old card upload handlers - not needed anymore
-// ----------------------
+// Remove old auto-refresh - it interferes with editing
 // Load functions
 // ----------------------
 document.getElementById("refreshQueue").onclick = () => loadVideos();
 document.getElementById("refreshAIQueue").onclick = () => loadAIVideos();
 document.getElementById("refreshBrolls").onclick = () => loadBrolls();
-document.getElementById("refreshRedditQueue").onclick = () => loadRedditQueue();
 
 // Load Instagram queue (existing)
 async function loadVideos() {
