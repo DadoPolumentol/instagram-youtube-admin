@@ -545,42 +545,45 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
 // ----------------------
 // Submit Reddit URL for content fetch
 // ----------------------
-document.getElementById("submitRedditUrl").onclick = async () => {
-  const url = document.getElementById("redditPostUrl").value.trim();
-  const brollFilename = document.getElementById("brollSelectInitial").value;
-  
-  if (!url) {
-    alert("Reddit URL required");
-    return;
-  }
-  
-  if (!brollFilename) {
-    alert("Please select a B-roll video");
-    return;
-  }
-  
-  try {
-    // Submit job - worker will fetch content and wait for review
-    await supabaseClient.from("ai_shorts_queue").insert([{
-      reddit_url: url,
-      broll_filename: brollFilename,
-      source: "reddit_manual",
-      status: "pending"
-    }]);
+const submitRedditUrlBtn = document.getElementById("submitRedditUrl");
+if (submitRedditUrlBtn) {
+  submitRedditUrlBtn.onclick = async () => {
+    const url = document.getElementById("redditPostUrl").value.trim();
+    const brollFilename = document.getElementById("brollSelectInitial").value;
     
-    alert("✅ Job submitted!\n\nWorker will fetch the content.\nCheck 'Review & Edit' section below.");
+    if (!url) {
+      alert("Reddit URL required");
+      return;
+    }
     
-    // Reset form
-    document.getElementById("redditPostUrl").value = "";
+    if (!brollFilename) {
+      alert("Please select a B-roll video");
+      return;
+    }
     
-    // Refresh to show fetched jobs
-    setTimeout(loadFetchedJobs, 2000);
-    loadRedditQueue();
-  } catch (err) {
-    console.log("Insert error:", err);
-    alert("Failed to submit job. Check console.");
-  }
-};
+    try {
+      // Submit job - worker will fetch content and wait for review
+      await supabaseClient.from("ai_shorts_queue").insert([{
+        reddit_url: url,
+        broll_filename: brollFilename,
+        source: "reddit_manual",
+        status: "pending"
+      }]);
+      
+      alert("✅ Job submitted!\n\nWorker will fetch the content.\nCheck 'Review & Edit' section below.");
+      
+      // Reset form
+      document.getElementById("redditPostUrl").value = "";
+      
+      // Refresh to show fetched jobs
+      setTimeout(loadFetchedJobs, 2000);
+      loadRedditQueue();
+    } catch (err) {
+      console.log("Insert error:", err);
+      alert("Failed to submit job. Check console.");
+    }
+  };
+}
 
 // ----------------------
 // Load jobs waiting for review (status="fetched")
