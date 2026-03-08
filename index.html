@@ -228,6 +228,10 @@
       <button id="refreshBrolls" style="background-color: #2196F3; color: white;">
         🔄 Refresh List
       </button>
+      <button id="cleanupBrolls" style="background-color: #ff9800; color: white;">
+        🗑️ Delete Old B-rolls (Keep 10)
+      </button>
+      <span id="brollStatus" style="font-size: 12px; color: #666;"></span>
     </div>
     <div id="brollList" style="margin-top:10px;"></div>
   </div>
@@ -1002,6 +1006,70 @@ document.getElementById("cleanupRedditQueue").onclick = async () => {
       statusEl.textContent = `✓ Deleted ${idsToDelete.length} old records`;
       statusEl.style.color = "green";
       loadRedditQueue();
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+    }
+    
+  } catch (err) {
+    statusEl.textContent = "❌ Error: " + err.message;
+    statusEl.style.color = "red";
+    console.error("Cleanup error:", err);
+  }
+};
+
+// ----------------------
+// Cleanup B-rolls (delete all but last 10)
+// ----------------------
+document.getElementById("cleanupBrolls").onclick = async () => {
+  const statusEl = document.getElementById("brollStatus");
+  
+  try {
+    // Get all B-rolls ordered by creation date
+    const { data: allBrolls } = await supabaseClient
+      .from("reddit_broll")
+      .select("id, filename")
+      .order("created_at", { ascending: false });
+    
+    if (!allBrolls || allBrolls.length <= 10) {
+      statusEl.textContent = "✓ No old B-rolls to delete (10 or fewer total)";
+      statusEl.style.color = "green";
+      setTimeout(() => { statusEl.textContent = ""; }, 5000);
+      return;
+    }
+    
+    // Get IDs to delete (everything after the first 10)
+    const toDelete = allBrolls.slice(10);
+    const idsToDelete = toDelete.map(b => b.id);
+    const filenamesToDelete = toDelete.map(b => b.filename);
+    
+    const confirmed = confirm(`Delete ${toDelete.length} old B-rolls (keep last 10)?`);
+    if (!confirmed) {
+      statusEl.textContent = "Cancelled";
+      statusEl.style.color = "#666";
+      setTimeout(() => { statusEl.textContent = ""; }, 3000);
+      return;
+    }
+    
+    statusEl.textContent = "⏳ Deleting...";
+    statusEl.style.color = "blue";
+    
+    // Delete from database
+    const { error } = await supabaseClient
+      .from("reddit_broll")
+      .delete()
+      .in("id", idsToDelete);
+    
+    if (error) {
+      statusEl.textContent = "❌ Delete failed";
+      statusEl.style.color = "red";
+      console.error("Delete error:", error);
+    } else {
+      statusEl.textContent = `✓ Deleted ${toDelete.length} old B-rolls from database`;
+      statusEl.style.color = "green";
+      
+      // Note: Files need to be deleted by worker or manually
+      console.log("Files to delete manually:", filenamesToDelete);
+      
+      loadBrolls();
       setTimeout(() => { statusEl.textContent = ""; }, 5000);
     }
     
