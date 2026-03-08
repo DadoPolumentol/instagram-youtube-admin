@@ -505,10 +505,28 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
   }
   
   try {
+    statusEl.innerHTML = '<span style="color: blue;">⏳ Checking for duplicates...</span>';
+    
+    // Check if this URL already exists (pending or downloaded)
+    const { data: existing } = await supabaseClient
+      .from("reddit_broll")
+      .select("id, filename, duration_seconds")
+      .eq("reddit_url", url);
+    
+    if (existing && existing.length > 0) {
+      const entry = existing[0];
+      if (entry.duration_seconds > 0) {
+        statusEl.innerHTML = '<span style="color: orange;">⚠️ This URL was already downloaded: ' + entry.filename + '</span>';
+      } else {
+        statusEl.innerHTML = '<span style="color: orange;">⚠️ This URL is already pending download</span>';
+      }
+      setTimeout(() => { statusEl.innerHTML = ""; }, 5000);
+      return;
+    }
+    
     statusEl.innerHTML = '<span style="color: blue;">⏳ Submitting download job...</span>';
     
-    // Insert into reddit_broll with special "pending" marker
-    // Worker will check for entries with 0 duration and download them
+    // Insert into reddit_broll with pending marker
     await supabaseClient.from("reddit_broll").insert([{
       reddit_url: url,
       filename: "pending_download",
@@ -521,6 +539,7 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
     
     setTimeout(() => {
       loadBrolls();
+      statusEl.innerHTML = "";
     }, 2000);
     
   } catch (error) {
