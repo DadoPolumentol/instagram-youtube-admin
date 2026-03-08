@@ -797,12 +797,22 @@ async function deleteRedditJob(jobId) {
   }
 }
 
-// Auto-refresh fetched jobs every 5 seconds when on Reddit section
+// Auto-refresh fetched jobs every 10 seconds (only if no input is focused)
 setInterval(() => {
   if (document.getElementById("redditShortsSection").style.display !== "none") {
-    loadFetchedJobs();
+    // Don't refresh if user is currently editing
+    const activeElement = document.activeElement;
+    const isEditing = activeElement && (
+      activeElement.tagName === 'INPUT' || 
+      activeElement.tagName === 'TEXTAREA' ||
+      activeElement.id.startsWith('edit-')
+    );
+    
+    if (!isEditing) {
+      loadFetchedJobs();
+    }
   }
-}, 5000);
+}, 10000);  // Changed to 10 seconds and only when not editing
 
 // Remove old card upload handlers - not needed anymore
 // ----------------------
