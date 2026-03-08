@@ -238,39 +238,34 @@
 
   <!-- SECTION 4: Reddit Shorts Creation (NEW) -->
   <div id="redditShortsSection" style="display:none;">
-    <h3>📝 Create Reddit Short (Manual Curation)</h3>
+    <h3>📝 Create Reddit Short (Step 1: Submit URL)</h3>
     
     <div class="form-group">
       <label for="redditPostUrl">Reddit Post URL *</label>
       <input type="text" id="redditPostUrl" placeholder="https://www.reddit.com/r/AskReddit/comments/... (or mobile share link)" style="width:100%; max-width:500px;">
       <div class="helper-text">
-        Paste any Reddit post URL - worker will fetch the content automatically
+        Paste any Reddit post URL - worker will fetch the content for you to review
       </div>
     </div>
 
     <div class="form-group">
-      <label for="redditCardFile">Upload Custom Reddit Card PNG *</label>
-      <div class="file-upload-area" id="cardUploadArea">
-        <input type="file" id="redditCardFile" accept="image/png,image/jpg,image/jpeg" style="display:none;">
-        <p>📤 Click to upload custom Reddit card image</p>
-        <small style="color: #666;">Required - will be overlaid on B-roll</small>
-      </div>
-      <img id="cardPreview" class="preview-image" style="display:none;">
-    </div>
-
-    <div class="form-group">
-      <label for="brollSelect">Select B-roll *</label>
-      <select id="brollSelect" style="width:100%; max-width:500px;">
+      <label for="brollSelectInitial">Select B-roll *</label>
+      <select id="brollSelectInitial" style="width:100%; max-width:500px;">
         <option value="">Select a B-roll video...</option>
       </select>
       <div class="helper-text">
-        Choose from downloaded Reddit B-roll videos
+        Choose background video (can be changed later)
       </div>
     </div>
 
-    <button id="fetchRedditPost" style="background-color: #FF8C00; color: white; margin-top: 20px;">🚀 Submit Job</button>
+    <button id="submitRedditUrl" style="background-color: #FF8C00; color: white; margin-top: 20px;">📥 Fetch Content</button>
     <div class="helper-text" style="margin-top: 10px;">
-      Worker will automatically fetch post content, generate TTS, overlay your card, and create video
+      Worker will fetch title & description for you to review
+    </div>
+
+    <h3 style="margin-top: 40px;">📋 Review & Edit Fetched Content</h3>
+    <div id="fetchedJobsContainer" style="margin-top: 20px;">
+      <p style="color: #666;">No jobs waiting for review</p>
     </div>
 
     <h3>Reddit Shorts Queue (Last 10 Jobs)</h3>
@@ -548,66 +543,38 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
 };
 
 // ----------------------
-// Submit Reddit Short (worker will fetch and process)
+// Submit Reddit URL for content fetch
 // ----------------------
-document.getElementById("fetchRedditPost").onclick = async () => {
+document.getElementById("submitRedditUrl").onclick = async () => {
   const url = document.getElementById("redditPostUrl").value.trim();
+  const brollFilename = document.getElementById("brollSelectInitial").value;
   
   if (!url) {
     alert("Reddit URL required");
     return;
   }
   
-  if (!confirm("Submit job? Worker will fetch the post content and process it.")) {
+  if (!brollFilename) {
+    alert("Please select a B-roll video");
     return;
   }
   
   try {
-    // Submit job to Supabase - worker will handle fetching
-    const brollFilename = document.getElementById("brollSelect").value;
-    
-    if (!brollFilename) {
-      alert("Please select a B-roll video first");
-      return;
-    }
-    
-    let customCardUrl = null;
-    
-    // Upload custom card if provided
-    if (uploadedCardFile) {
-      const filename = `reddit_card_${Date.now()}.png`;
-      const { data, error } = await supabaseClient.storage
-        .from('reddit-cards')
-        .upload(filename, uploadedCardFile);
-      
-      if (error) {
-        console.log("Card upload error:", error);
-        alert("Failed to upload card. Continue without it?");
-      } else {
-        const { data: { publicUrl } } = supabaseClient.storage
-          .from('reddit-cards')
-          .getPublicUrl(filename);
-        customCardUrl = publicUrl;
-      }
-    }
-    
-    // Insert job - worker will fetch content and process
+    // Submit job - worker will fetch content and wait for review
     await supabaseClient.from("ai_shorts_queue").insert([{
       reddit_url: url,
       broll_filename: brollFilename,
-      custom_card_url: customCardUrl,
       source: "reddit_manual",
       status: "pending"
     }]);
     
-    alert("✅ Job submitted! Worker will fetch content and create video.");
+    alert("✅ Job submitted!\n\nWorker will fetch the content.\nCheck 'Review & Edit' section below.");
     
     // Reset form
     document.getElementById("redditPostUrl").value = "";
-    document.getElementById("redditCardFile").value = "";
-    document.getElementById("cardPreview").style.display = "none";
-    uploadedCardFile = null;
     
+    // Refresh to show fetched jobs
+    setTimeout(loadFetchedJobs, 2000);
     loadRedditQueue();
   } catch (err) {
     console.log("Insert error:", err);
@@ -615,8 +582,168 @@ document.getElementById("fetchRedditPost").onclick = async () => {
   }
 };
 
-// Remove the old fetchedContent section - not needed anymore
-// User just submits URL directly, worker handles everything
+// ----------------------
+// Load jobs waiting for review (status="fetched")
+// ----------------------
+async function loadFetchedJobs() {
+  try {
+    const { data } = await supabaseClient
+      .from("ai_shorts_queue")
+      .select("*")
+      .eq("source", "reddit_manual")
+      .eq("status", "fetched")
+      .order("created_at", { ascending: false });
+
+    const container = document.getElementById("fetchedJobsContainer");
+    
+    if (!data || data.length === 0) {
+      container.innerHTML = '<p style="color: #666;">No jobs waiting for review. Submit a URL above!</p>';
+      return;
+    }
+
+    container.innerHTML = data.map(job => `
+      <div style="border: 2px solid #FF8C00; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #fff8f0;">
+        <h4 style="margin-top: 0; color: #FF8C00;">Job #${job.id} - Ready for Review</h4>
+        
+        <div class="form-group">
+          <label>Title (edit if needed):</label>
+          <input type="text" id="edit-title-${job.id}" value="${(job.title || '').replace(/"/g, '&quot;')}" style="width: 100%; padding: 8px; font-size: 14px;">
+        </div>
+        
+        <div class="form-group">
+          <label>Description/Script (edit if needed):</label>
+          <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px; font-size: 14px;">${job.script || ''}</textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Upload Custom Reddit Card PNG *</label>
+          <div class="file-upload-area" onclick="document.getElementById('card-${job.id}').click()">
+            <input type="file" id="card-${job.id}" accept="image/png,image/jpg,image/jpeg" style="display:none;">
+            <p>📤 Click to upload custom card image</p>
+          </div>
+          <img id="preview-${job.id}" style="max-width: 300px; margin-top: 10px; display: none;">
+        </div>
+        
+        <div class="form-group">
+          <label>B-roll:</label>
+          <select id="edit-broll-${job.id}" style="width: 100%; padding: 8px;">
+            <option value="${job.broll_filename}">${job.broll_filename} (current)</option>
+          </select>
+        </div>
+        
+        <button onclick="submitReviewedJob(${job.id})" style="background-color: #4CAF50; color: white; padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;">
+          ✅ Approve & Create Video
+        </button>
+        <button onclick="deleteJob(${job.id})" style="background-color: #f44336; color: white; padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+          🗑️ Delete
+        </button>
+      </div>
+    `).join('');
+    
+    // Add file upload handlers
+    data.forEach(job => {
+      const fileInput = document.getElementById(`card-${job.id}`);
+      const preview = document.getElementById(`preview-${job.id}`);
+      
+      fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            preview.src = e.target.result;
+            preview.style.display = "block";
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+    });
+    
+    // Load B-roll options for each dropdown
+    loadBrollsForSelect();
+    
+  } catch (err) {
+    console.error("Load fetched jobs error:", err);
+  }
+}
+
+// ----------------------
+// Submit reviewed job (upload card and change status to "ready")
+// ----------------------
+async function submitReviewedJob(jobId) {
+  const title = document.getElementById(`edit-title-${jobId}`).value.trim();
+  const script = document.getElementById(`edit-script-${jobId}`).value.trim();
+  const broll = document.getElementById(`edit-broll-${jobId}`).value;
+  const cardFile = document.getElementById(`card-${jobId}`).files[0];
+  
+  if (!title) {
+    alert("Title is required");
+    return;
+  }
+  
+  if (!cardFile) {
+    alert("Please upload a custom card image");
+    return;
+  }
+  
+  try {
+    // Upload card to storage
+    const filename = `reddit_card_${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('reddit-cards')
+      .upload(filename, cardFile);
+    
+    if (uploadError) {
+      alert("Card upload failed: " + uploadError.message);
+      return;
+    }
+    
+    const { data: { publicUrl } } = supabaseClient.storage
+      .from('reddit-cards')
+      .getPublicUrl(filename);
+    
+    // Update job with edited content and change status to "ready"
+    const { error } = await supabaseClient.from("ai_shorts_queue").update({
+      title: title,
+      script: script,
+      broll_filename: broll,
+      custom_card_url: publicUrl,
+      status: "ready"
+    }).eq("id", jobId);
+    
+    if (error) {
+      alert("Update failed: " + error.message);
+      return;
+    }
+    
+    alert("✅ Approved! Worker will create the video now.");
+    
+    loadFetchedJobs();
+    loadRedditQueue();
+    
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
+async function deleteJob(jobId) {
+  if (!confirm("Delete this job?")) return;
+  
+  try {
+    await supabaseClient.from("ai_shorts_queue").delete().eq("id", jobId);
+    alert("✓ Deleted");
+    loadFetchedJobs();
+    loadRedditQueue();
+  } catch (err) {
+    alert("Delete failed: " + err.message);
+  }
+}
+
+// Load fetched jobs when section is shown
+setInterval(() => {
+  if (document.getElementById("redditShortsSection").style.display !== "none") {
+    loadFetchedJobs();
+  }
+}, 5000);  // Refresh every 5 seconds
 
 // ----------------------
 // Card file upload
@@ -884,16 +1011,28 @@ async function loadBrollsForSelect() {
     const { data } = await supabaseClient
       .from("reddit_broll")
       .select("filename, duration_seconds")
+      .neq("duration_seconds", 0)  // Skip pending
       .order("created_at", { ascending: false });
 
-    const select = document.getElementById("brollSelect");
-    select.innerHTML = '<option value="">Select a B-roll video...</option>';
-
-    if (data && data.length > 0) {
-      data.forEach(broll => {
-        select.innerHTML += `<option value="${broll.filename}">${broll.filename} (${broll.duration_seconds}s)</option>`;
-      });
-    }
+    const options = '<option value="">Select a B-roll video...</option>' + 
+      (data && data.length > 0 ? data.map(broll => 
+        `<option value="${broll.filename}">${broll.filename} (${broll.duration_seconds}s)</option>`
+      ).join('') : '');
+    
+    // Update all B-roll select elements
+    const selects = ['brollSelectInitial'];
+    selects.forEach(id => {
+      const elem = document.getElementById(id);
+      if (elem) elem.innerHTML = options;
+    });
+    
+    // Also update any edit-broll-* dropdowns for fetched jobs
+    document.querySelectorAll('[id^="edit-broll-"]').forEach(select => {
+      const currentValue = select.value;
+      select.innerHTML = options;
+      if (currentValue) select.value = currentValue;  // Restore selection
+    });
+    
   } catch (err) {
     console.log("Load B-rolls for select error:", err);
   }
