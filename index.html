@@ -601,18 +601,30 @@ async function loadFetchedJobs() {
       return;
     }
 
-    container.innerHTML = data.map(job => `
+    container.innerHTML = data.map(job => {
+      // Escape HTML to prevent XSS
+      const escapeHtml = (str) => {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+      };
+      
+      const safeTitle = escapeHtml(job.title);
+      const safeScript = escapeHtml(job.script);
+      const safeBroll = escapeHtml(job.broll_filename);
+      
+      return `
       <div style="border: 2px solid #FF8C00; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #fff8f0;">
         <h4 style="margin-top: 0; color: #FF8C00;">Job #${job.id} - Ready for Review</h4>
         
         <div class="form-group">
           <label>Title (edit if needed):</label>
-          <input type="text" id="edit-title-${job.id}" value="${(job.title || '').replace(/"/g, '&quot;')}" style="width: 100%; padding: 8px; font-size: 14px;">
+          <input type="text" id="edit-title-${job.id}" value="${safeTitle}" style="width: 100%; padding: 8px; font-size: 14px;">
         </div>
         
         <div class="form-group">
           <label>Description/Script (edit if needed):</label>
-          <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px; font-size: 14px;">${job.script || ''}</textarea>
+          <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px; font-size: 14px;">${safeScript}</textarea>
         </div>
         
         <div class="form-group">
@@ -627,7 +639,7 @@ async function loadFetchedJobs() {
         <div class="form-group">
           <label>B-roll:</label>
           <select id="edit-broll-${job.id}" style="width: 100%; padding: 8px;">
-            <option value="${job.broll_filename}">${job.broll_filename} (current)</option>
+            <option value="${safeBroll}">${safeBroll} (current)</option>
           </select>
         </div>
         
@@ -638,7 +650,8 @@ async function loadFetchedJobs() {
           🗑️ Delete
         </button>
       </div>
-    `).join('');
+    `;
+    }).join('');
     
     // Add file upload handlers
     data.forEach(job => {
