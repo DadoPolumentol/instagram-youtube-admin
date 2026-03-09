@@ -691,13 +691,11 @@ async function loadFetchedJobs() {
               <select id="edit-voice-${job.id}" style="width: 100%; padding: 8px;">
                 <option value="guy" selected>Guy (Male, Neutral) 🎙️</option>
                 <option value="jenny">Jenny (Female, Friendly) 👩</option>
-                <option value="aria">Aria (Female, Energetic) ⚡</option>
-                <option value="davis">Davis (Male, Warm) 😊</option>
-                <option value="jane">Jane (Female, Professional) 💼</option>
-                <option value="jason">Jason (Male, Authoritative) 📢</option>
-                <option value="sara">Sara (Female, Casual) 🎵</option>
-                <option value="tony">Tony (Male, Enthusiastic) 🔥</option>
-                <option value="nancy">Nancy (Female, Calm) 🧘</option>
+                <option value="aria">Aria (Female, News) 📰</option>
+                <option value="eric">Eric (Male, Young) 👨</option>
+                <option value="michelle">Michelle (Female, Adult) 👩‍💼</option>
+                <option value="roger">Roger (Male, Senior) 👴</option>
+                <option value="steffan">Steffan (Male, Young Adult) 🧑</option>
                 <option value="andrew">Andrew (Male, British) 🇬🇧</option>
                 <option value="sonia">Sonia (Female, British) 🇬🇧</option>
               </select>
@@ -807,19 +805,13 @@ async function approveJob(jobId) {
     return;
   }
   
-  // Calculate estimated duration
-  const estimatedDuration = estimateVideoDuration(title, script, ttsSpeed);
-  const minutes = Math.floor(estimatedDuration / 60);
-  const seconds = Math.floor(estimatedDuration % 60);
-  const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-  
-  // Confirm with user
+  // Confirm with user (worker will calculate actual duration)
   const confirmed = confirm(
     `Ready to create video?\n\n` +
-    `📊 Estimated Duration: ${durationStr}\n` +
     `🎙️ Voice: ${ttsVoice}\n` +
     `⚡ Speed: ${ttsSpeed}x\n\n` +
-    `Click OK to proceed.`
+    `Click OK to proceed.\n` +
+    `Worker will calculate actual duration.`
   );
   
   if (!confirmed) return;
@@ -855,28 +847,13 @@ async function approveJob(jobId) {
       return;
     }
     
-    alert(`✅ Approved! Worker will create the video now.\n\nEstimated: ${durationStr}`);
+    alert(`✅ Approved! Worker will create the video now.`);
     loadFetchedJobs();
     loadRedditQueue();
     
   } catch (err) {
     alert("Error: " + err.message);
   }
-}
-
-function estimateVideoDuration(title, script, speed) {
-  // Rough estimates:
-  // - Average speaking rate: ~150 words per minute at 1.0x speed
-  // - Adjusted for speed multiplier
-  const titleWords = title.trim().split(/\s+/).length;
-  const scriptWords = script.trim().split(/\s+/).length;
-  const totalWords = titleWords + scriptWords;
-  
-  const wordsPerMinute = 150 * speed;  // Adjust for speed
-  const minutes = totalWords / wordsPerMinute;
-  const seconds = minutes * 60;
-  
-  return seconds;
 }
 
 async function deleteRedditJob(jobId) {
