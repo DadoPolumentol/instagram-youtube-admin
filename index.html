@@ -685,6 +685,35 @@ async function loadFetchedJobs() {
             <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px; font-size: 14px;">${safeScript}</textarea>
           </div>
           
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label>TTS Voice:</label>
+              <select id="edit-voice-${job.id}" style="width: 100%; padding: 8px;">
+                <option value="guy" selected>Guy (Male, Neutral) 🎙️</option>
+                <option value="jenny">Jenny (Female, Friendly) 👩</option>
+                <option value="aria">Aria (Female, Energetic) ⚡</option>
+                <option value="davis">Davis (Male, Warm) 😊</option>
+                <option value="jane">Jane (Female, Professional) 💼</option>
+                <option value="jason">Jason (Male, Authoritative) 📢</option>
+                <option value="sara">Sara (Female, Casual) 🎵</option>
+                <option value="tony">Tony (Male, Enthusiastic) 🔥</option>
+                <option value="nancy">Nancy (Female, Calm) 🧘</option>
+                <option value="andrew">Andrew (Male, British) 🇬🇧</option>
+                <option value="sonia">Sonia (Female, British) 🇬🇧</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>TTS Speed: <span id="speed-display-${job.id}">1.25x</span></label>
+              <input type="range" id="edit-speed-${job.id}" min="1.0" max="1.6" step="0.05" value="1.25" 
+                     style="width: 100%;" 
+                     oninput="document.getElementById('speed-display-${job.id}').textContent = parseFloat(this.value).toFixed(2) + 'x'">
+              <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                1.0x = Normal | 1.25x = Recommended | 1.6x = Very Fast
+              </div>
+            </div>
+          </div>
+          
           <div class="form-group">
             <label>Upload Custom Reddit Card PNG *</label>
             <div class="file-upload-area" onclick="document.getElementById('card-${job.id}').click()">
@@ -692,6 +721,10 @@ async function loadFetchedJobs() {
               <p>📤 Click to upload (now you can copy/paste the title!)</p>
             </div>
             <img id="preview-${job.id}" style="max-width: 300px; margin-top: 10px; display: none;">
+          </div>
+          
+          <div id="estimate-${job.id}" style="background: #e8f5e9; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 14px;">
+            📊 Calculating estimated duration...
           </div>
           
           <button onclick="approveJob(${job.id})" style="background-color: #4CAF50; color: white; padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;">
@@ -704,7 +737,7 @@ async function loadFetchedJobs() {
       `;
     }).join('');
     
-    // Add file upload handlers
+    // Add file upload handlers and estimate duration
     data.forEach(job => {
       const fileInput = document.getElementById(`card-${job.id}`);
       const preview = document.getElementById(`preview-${job.id}`);
@@ -722,6 +755,34 @@ async function loadFetchedJobs() {
           }
         };
       }
+      
+      // Calculate estimated duration
+      const titleLength = (job.title || '').length;
+      const scriptLength = (job.script || '').length;
+      
+      // Rough estimate: ~150 chars per minute of speech at 1.0x
+      const baseSeconds = ((titleLength + scriptLength) / 150) * 60;
+      const speed = 1.20; // Default speed
+      const estimatedSeconds = Math.round(baseSeconds / speed);
+      const minutes = Math.floor(estimatedSeconds / 60);
+      const seconds = estimatedSeconds % 60;
+      
+      const estimateEl = document.getElementById(`estimate-${job.id}`);
+      if (estimateEl) {
+        estimateEl.innerHTML = `📊 <strong>Estimated duration:</strong> ${minutes}m ${seconds}s @ ${speed}x speed (${titleLength + scriptLength} characters)`;
+      }
+      
+      // Update estimate when speed changes
+      const speedInput = document.getElementById(`edit-speed-${job.id}`);
+      if (speedInput) {
+        speedInput.oninput = function() {
+          const newSpeed = parseFloat(this.value);
+          const newSeconds = Math.round(baseSeconds / newSpeed);
+          const newMin = Math.floor(newSeconds / 60);
+          const newSec = newSeconds % 60;
+          estimateEl.innerHTML = `📊 <strong>Estimated duration:</strong> ${newMin}m ${newSec}s @ ${newSpeed.toFixed(2)}x speed (${titleLength + scriptLength} characters)`;
+        };
+      }
     });
     
   } catch (err) {
@@ -733,6 +794,8 @@ async function approveJob(jobId) {
   const title = document.getElementById(`edit-title-${jobId}`).value.trim();
   const script = document.getElementById(`edit-script-${jobId}`).value.trim();
   const cardFile = document.getElementById(`card-${jobId}`).files[0];
+  const ttsVoice = document.getElementById(`edit-voice-${jobId}`).value;
+  const ttsSpeed = parseFloat(document.getElementById(`edit-speed-${jobId}`).value);
   
   if (!title) {
     alert("Title is required");
@@ -743,6 +806,23 @@ async function approveJob(jobId) {
     alert("Please upload a custom card image");
     return;
   }
+  
+  // Calculate estimated duration
+  const estimatedDuration = estimateVideoDuration(title, script, ttsSpeed);
+  const minutes = Math.floor(estimatedDuration / 60);
+  const seconds = Math.floor(estimatedDuration % 60);
+  const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  
+  // Confirm with user
+  const confirmed = confirm(
+    `Ready to create video?\n\n` +
+    `📊 Estimated Duration: ${durationStr}\n` +
+    `🎙️ Voice: ${ttsVoice}\n` +
+    `⚡ Speed: ${ttsSpeed}x\n\n` +
+    `Click OK to proceed.`
+  );
+  
+  if (!confirmed) return;
   
   try {
     // Upload card
@@ -760,11 +840,13 @@ async function approveJob(jobId) {
       .from('reddit-cards')
       .getPublicUrl(filename);
     
-    // Update job
+    // Update job with TTS settings
     const { error } = await supabaseClient.from("ai_shorts_queue").update({
       title: title,
       script: script,
       custom_card_url: publicUrl,
+      tts_voice: ttsVoice,
+      tts_speed: ttsSpeed,
       status: "ready"
     }).eq("id", jobId);
     
@@ -773,13 +855,28 @@ async function approveJob(jobId) {
       return;
     }
     
-    alert("✅ Approved! Worker will create the video now.");
+    alert(`✅ Approved! Worker will create the video now.\n\nEstimated: ${durationStr}`);
     loadFetchedJobs();
     loadRedditQueue();
     
   } catch (err) {
     alert("Error: " + err.message);
   }
+}
+
+function estimateVideoDuration(title, script, speed) {
+  // Rough estimates:
+  // - Average speaking rate: ~150 words per minute at 1.0x speed
+  // - Adjusted for speed multiplier
+  const titleWords = title.trim().split(/\s+/).length;
+  const scriptWords = script.trim().split(/\s+/).length;
+  const totalWords = titleWords + scriptWords;
+  
+  const wordsPerMinute = 150 * speed;  // Adjust for speed
+  const minutes = totalWords / wordsPerMinute;
+  const seconds = minutes * 60;
+  
+  return seconds;
 }
 
 async function deleteRedditJob(jobId) {
