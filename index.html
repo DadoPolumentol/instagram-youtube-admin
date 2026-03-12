@@ -238,14 +238,24 @@
 
   <!-- SECTION 4: Reddit Shorts Creation (NEW) -->
   <div id="redditShortsSection" style="display:none;">
-    <h3>📝 Step 1: Submit Reddit URL</h3>
+    <h3>📝 Create Reddit Short (Manual Curation)</h3>
     
     <div class="form-group">
       <label for="redditPostUrl">Reddit Post URL *</label>
       <input type="text" id="redditPostUrl" placeholder="https://www.reddit.com/r/AskReddit/comments/... (or mobile share link)" style="width:100%; max-width:500px;">
       <div class="helper-text">
-        Worker will fetch the content for you to review
+        Paste any Reddit post URL - worker will fetch the content automatically
       </div>
+    </div>
+
+    <div class="form-group">
+      <label for="redditCardFile">Upload Custom Reddit Card PNG *</label>
+      <div class="file-upload-area" id="cardUploadArea">
+        <input type="file" id="redditCardFile" accept="image/png,image/jpg,image/jpeg" style="display:none;">
+        <p>📤 Click to upload custom Reddit card image</p>
+        <small style="color: #666;">Required - will be overlaid on B-roll</small>
+      </div>
+      <img id="cardPreview" class="preview-image" style="display:none;">
     </div>
 
     <div class="form-group">
@@ -253,19 +263,22 @@
       <select id="brollSelect" style="width:100%; max-width:500px;">
         <option value="">Select a B-roll video...</option>
       </select>
+      <div class="helper-text">
+        Choose from downloaded Reddit B-roll videos
+      </div>
     </div>
 
-    <button id="fetchRedditPost" style="background-color: #FF8C00; color: white; margin-top: 20px;">📥 Fetch Content</button>
+    <button id="fetchRedditPost" style="background-color: #FF8C00; color: white; margin-top: 20px;">🚀 Submit Job</button>
     <div class="helper-text" style="margin-top: 10px;">
-      After ~10 seconds, click "Refresh" below to see fetched content
+      Worker will automatically fetch post content, generate TTS, overlay your card, and create video
     </div>
 
-    <h3 style="margin-top: 40px;">📋 Step 2: Review & Edit Fetched Content</h3>
+    <h3 style="margin-top: 40px;">📋 Fetched Jobs (Click Refresh to Load)</h3>
     <button onclick="loadFetchedJobs()" style="background-color: #4CAF50; color: white; margin-bottom: 15px;">
       🔄 Refresh Fetched Jobs
     </button>
     <div id="fetchedJobsContainer" style="margin-top: 10px;">
-      <p style="color: #666;">No jobs waiting for review. Submit a URL above!</p>
+      <p style="color: #666;">Click refresh to load fetched jobs</p>
     </div>
 
     <h3>Reddit Shorts Queue (Last 10 Jobs)</h3>
@@ -547,29 +560,62 @@ document.getElementById("downloadRedditBroll").onclick = async () => {
 // ----------------------
 document.getElementById("fetchRedditPost").onclick = async () => {
   const url = document.getElementById("redditPostUrl").value.trim();
-  const brollFilename = document.getElementById("brollSelect").value;
   
   if (!url) {
     alert("Reddit URL required");
     return;
   }
   
-  if (!brollFilename) {
-    alert("Please select a B-roll video");
+  if (!confirm("Submit job? Worker will fetch the post content and process it.")) {
     return;
   }
   
   try {
+    // Submit job to Supabase - worker will handle fetching
+    const brollFilename = document.getElementById("brollSelect").value;
+    
+    if (!brollFilename) {
+      alert("Please select a B-roll video first");
+      return;
+    }
+    
+    let customCardUrl = null;
+    
+    // Upload custom card if provided
+    if (uploadedCardFile) {
+      const filename = `reddit_card_${Date.now()}.png`;
+      const { data, error } = await supabaseClient.storage
+        .from('reddit-cards')
+        .upload(filename, uploadedCardFile);
+      
+      if (error) {
+        console.log("Card upload error:", error);
+        alert("Failed to upload card. Continue without it?");
+      } else {
+        const { data: { publicUrl } } = supabaseClient.storage
+          .from('reddit-cards')
+          .getPublicUrl(filename);
+        customCardUrl = publicUrl;
+      }
+    }
+    
+    // Insert job - worker will fetch content and process
     await supabaseClient.from("ai_shorts_queue").insert([{
       reddit_url: url,
       broll_filename: brollFilename,
+      custom_card_url: customCardUrl,
       source: "reddit_manual",
       status: "pending"
     }]);
     
-    alert("✅ Job submitted!\n\nWorker will fetch the content in ~10 seconds.\nThen click 'Refresh Fetched Jobs' to review.");
+    alert("✅ Job submitted! Worker will fetch content and create video.");
     
+    // Reset form
     document.getElementById("redditPostUrl").value = "";
+    document.getElementById("redditCardFile").value = "";
+    document.getElementById("cardPreview").style.display = "none";
+    uploadedCardFile = null;
+    
     loadRedditQueue();
   } catch (err) {
     console.log("Insert error:", err);
@@ -577,9 +623,8 @@ document.getElementById("fetchRedditPost").onclick = async () => {
   }
 };
 
-// ----------------------
-// Load and display fetched jobs
-// ----------------------
+// Remove the old fetchedContent section - not needed anymore
+// User just submits URL directly, worker handles everything
 
 // ----------------------
 // Card file upload
@@ -1154,87 +1199,40 @@ document.getElementById("cleanupBrolls").onclick = async () => {
   }
 };
 
+// ----------------------
+// Fetched jobs review functions
+// ----------------------
 async function loadFetchedJobs() {
   try {
-    const { data } = await supabaseClient
-      .from("ai_shorts_queue")
-      .select("*")
-      .eq("source", "reddit_manual")
-      .eq("status", "fetched")
+    const { data } = await supabaseClient.from("ai_shorts_queue").select("*")
+      .eq("source", "reddit_manual").eq("status", "fetched")
       .order("created_at", { ascending: false });
-
     const container = document.getElementById("fetchedJobsContainer");
-    
     if (!data || data.length === 0) {
-      container.innerHTML = '<p style="color: #666;">No jobs waiting for review. Submit a URL above!</p>';
+      container.innerHTML = '<p style="color: #666;">No fetched jobs</p>';
       return;
     }
-
-    container.innerHTML = data.map(job => {
-      const escapeHtml = (str) => {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
-      };
-      
-      const safeTitle = escapeHtml(job.title);
-      const safeScript = escapeHtml(job.script);
-      
-      return `
-        <div style="border: 2px solid #FF8C00; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #fff8f0;">
-          <h4 style="margin-top: 0; color: #FF8C00;">Job #${job.id} - Ready for Review</h4>
-          
-          <div class="form-group">
-            <label>Title:</label>
-            <input type="text" id="edit-title-${job.id}" value="${safeTitle}" style="width: 100%; padding: 8px; font-size: 14px;">
-          </div>
-          
-          <div class="form-group">
-            <label>Description/Script:</label>
-            <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px; font-size: 14px;">${safeScript}</textarea>
-          </div>
-          
-          <div class="form-group">
-            <label>Upload Custom Reddit Card PNG *</label>
-            <div class="file-upload-area" onclick="document.getElementById('card-${job.id}').click()">
-              <input type="file" id="card-${job.id}" accept="image/png,image/jpg,image/jpeg" style="display:none;">
-              <p>📤 Click to upload card (now you can copy/paste the title!)</p>
-            </div>
-            <img id="preview-${job.id}" style="max-width: 300px; margin-top: 10px; display: none;">
-          </div>
-          
-          <button onclick="approveJob(${job.id})" style="background-color: #4CAF50; color: white; padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;">
-            ✅ Approve & Create Video
-          </button>
-          <button onclick="deleteRedditJob(${job.id})" style="background-color: #f44336; color: white; padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
-            🗑️ Delete
-          </button>
+    container.innerHTML = data.map(job => `
+      <div style="border: 2px solid #FF8C00; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #fff8f0;">
+        <h4>Job #${job.id}</h4>
+        <div class="form-group">
+          <label>Title:</label>
+          <input type="text" id="edit-title-${job.id}" value="${(job.title || '').replace(/"/g, '&quot;')}" style="width: 100%; padding: 8px;">
         </div>
-      `;
-    }).join('');
-    
-    // Add file upload handlers
-    data.forEach(job => {
-      const fileInput = document.getElementById(`card-${job.id}`);
-      const preview = document.getElementById(`preview-${job.id}`);
-      
-      if (fileInput) {
-        fileInput.onchange = (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              preview.src = e.target.result;
-              preview.style.display = "block";
-            };
-            reader.readAsDataURL(file);
-          }
-        };
-      }
-    });
-    
+        <div class="form-group">
+          <label>Script:</label>
+          <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px;">${job.script || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Upload Card:</label>
+          <input type="file" id="card-${job.id}" accept="image/png,image/jpg,image/jpeg">
+        </div>
+        <button onclick="approveJob(${job.id})" style="background-color: #4CAF50; color: white; padding: 12px 24px;">Approve</button>
+        <button onclick="deleteRedditJob(${job.id})" style="background-color: #f44336; color: white; padding: 12px 24px; margin-left: 10px;">Delete</button>
+      </div>
+    `).join('');
   } catch (err) {
-    console.error("Load fetched jobs error:", err);
+    console.error(err);
   }
 }
 
@@ -1242,65 +1240,30 @@ async function approveJob(jobId) {
   const title = document.getElementById(`edit-title-${jobId}`).value.trim();
   const script = document.getElementById(`edit-script-${jobId}`).value.trim();
   const cardFile = document.getElementById(`card-${jobId}`).files[0];
-  
-  if (!title) {
-    alert("Title is required");
-    return;
-  }
-  
-  if (!cardFile) {
-    alert("Please upload a custom card image");
-    return;
-  }
-  
+  if (!title || !cardFile) { alert("Title and card required"); return; }
   try {
-    // Upload card
     const filename = `reddit_card_${Date.now()}.png`;
-    const { error: uploadError } = await supabaseClient.storage
-      .from('reddit-cards')
-      .upload(filename, cardFile);
-    
-    if (uploadError) {
-      alert("Card upload failed: " + uploadError.message);
-      return;
-    }
-    
-    const { data: { publicUrl } } = supabaseClient.storage
-      .from('reddit-cards')
-      .getPublicUrl(filename);
-    
-    // Update job
-    const { error } = await supabaseClient.from("ai_shorts_queue").update({
-      title: title,
-      script: script,
-      custom_card_url: publicUrl,
-      status: "ready"
+    await supabaseClient.storage.from('reddit-cards').upload(filename, cardFile);
+    const { data: { publicUrl } } = supabaseClient.storage.from('reddit-cards').getPublicUrl(filename);
+    await supabaseClient.from("ai_shorts_queue").update({
+      title, script, custom_card_url: publicUrl, status: "ready"
     }).eq("id", jobId);
-    
-    if (error) {
-      alert("Update failed: " + error.message);
-      return;
-    }
-    
-    alert("✅ Approved! Worker will create the video now.");
+    alert("Approved!");
     loadFetchedJobs();
     loadRedditQueue();
-    
   } catch (err) {
     alert("Error: " + err.message);
   }
 }
 
 async function deleteRedditJob(jobId) {
-  if (!confirm("Delete this job?")) return;
-  
+  if (!confirm("Delete?")) return;
   try {
     await supabaseClient.from("ai_shorts_queue").delete().eq("id", jobId);
-    alert("✓ Deleted");
     loadFetchedJobs();
     loadRedditQueue();
   } catch (err) {
-    alert("Delete failed: " + err.message);
+    alert("Delete failed");
   }
 }
 
