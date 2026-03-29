@@ -273,6 +273,14 @@
       Worker will automatically fetch post content, generate TTS, overlay your card, and create video
     </div>
 
+    <h3 style="margin-top: 40px;">📋 Fetched Jobs (Waiting for Review)</h3>
+    <button onclick="loadFetchedJobs()" style="background-color: #4CAF50; color: white; margin-bottom: 15px;">
+      🔄 Refresh Fetched Jobs
+    </button>
+    <div id="fetchedJobsContainer" style="margin-top: 10px;">
+      <p style="color: #666;">Click refresh to load fetched jobs</p>
+    </div>
+
     <h3>Reddit Shorts Queue (Last 10 Jobs)</h3>
     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
       <button id="refreshRedditQueue" style="background-color: #2196F3; color: white;">
@@ -1190,6 +1198,75 @@ document.getElementById("cleanupBrolls").onclick = async () => {
     console.error("Cleanup error:", err);
   }
 };
+
+// ----------------------
+// Fetched jobs - display jobs waiting for user review
+// ----------------------
+async function loadFetchedJobs() {
+  try {
+    const { data } = await supabaseClient.from("ai_shorts_queue").select("*")
+      .eq("source", "reddit_manual").eq("status", "fetched")
+      .order("created_at", { ascending: false });
+    const container = document.getElementById("fetchedJobsContainer");
+    if (!data || data.length === 0) {
+      container.innerHTML = '<p style="color: #666;">No fetched jobs. Jobs appear here after worker fetches content.</p>';
+      return;
+    }
+    container.innerHTML = data.map(job => `
+      <div style="border: 2px solid #FF8C00; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #fff8f0;">
+        <h4 style="margin-top: 0; color: #FF8C00;">Job #${job.id} - Fetched & Ready</h4>
+        <div class="form-group">
+          <label>Title:</label>
+          <input type="text" id="edit-title-${job.id}" value="${(job.title || '').replace(/"/g, '&quot;')}" style="width: 100%; padding: 8px;">
+        </div>
+        <div class="form-group">
+          <label>Script:</label>
+          <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px;">${job.script || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Upload Card:</label>
+          <input type="file" id="card-${job.id}" accept="image/png,image/jpg,image/jpeg">
+        </div>
+        <button onclick="approveJob(${job.id})" style="background-color: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer;">✅ Approve</button>
+        <button onclick="deleteJob(${job.id})" style="background-color: #f44336; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">🗑️ Delete</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function approveJob(jobId) {
+  const title = document.getElementById(`edit-title-${jobId}`).value.trim();
+  const script = document.getElementById(`edit-script-${jobId}`).value.trim();
+  const cardFile = document.getElementById(`card-${jobId}`).files[0];
+  if (!title || !cardFile) { alert("Title and card required"); return; }
+  try {
+    const filename = `reddit_card_${Date.now()}.png`;
+    await supabaseClient.storage.from('reddit-cards').upload(filename, cardFile);
+    const { data: { publicUrl } } = supabaseClient.storage.from('reddit-cards').getPublicUrl(filename);
+    await supabaseClient.from("ai_shorts_queue").update({
+      title, script, custom_card_url: publicUrl, status: "ready"
+    }).eq("id", jobId);
+    alert("✅ Approved! Worker will create video.");
+    loadFetchedJobs();
+    loadRedditQueue();
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
+async function deleteJob(jobId) {
+  if (!confirm("Delete this job?")) return;
+  try {
+    await supabaseClient.from("ai_shorts_queue").delete().eq("id", jobId);
+    alert("✓ Deleted");
+    loadFetchedJobs();
+    loadRedditQueue();
+  } catch (err) {
+    alert("Delete failed");
+  }
+}
 
 // ----------------------
 // Page load
