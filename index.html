@@ -1154,8 +1154,9 @@ async function loadFetchedJobs() {
           <textarea id="edit-script-${job.id}" style="width: 100%; min-height: 150px; padding: 8px;">${job.script || ''}</textarea>
         </div>
         <div class="form-group">
-          <label>Upload Card:</label>
+          <label>Upload Card (Optional):</label>
           <input type="file" id="card-${job.id}" accept="image/png,image/jpg,image/jpeg">
+          <small style="color: #666;">If not uploaded, worker will generate text overlay</small>
         </div>
         <button onclick="approveJob(${job.id})" style="background-color: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer;">✅ Approve</button>
         <button onclick="deleteJob(${job.id})" style="background-color: #f44336; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">🗑️ Delete</button>
@@ -1170,14 +1171,31 @@ async function approveJob(jobId) {
   const title = document.getElementById(`edit-title-${jobId}`).value.trim();
   const script = document.getElementById(`edit-script-${jobId}`).value.trim();
   const cardFile = document.getElementById(`card-${jobId}`).files[0];
-  if (!title || !cardFile) { alert("Title and card required"); return; }
+  
+  if (!title) { 
+    alert("Title is required"); 
+    return; 
+  }
+  
   try {
-    const filename = `reddit_card_${Date.now()}.png`;
-    await supabaseClient.storage.from('reddit-cards').upload(filename, cardFile);
-    const { data: { publicUrl } } = supabaseClient.storage.from('reddit-cards').getPublicUrl(filename);
+    let customCardUrl = null;
+    
+    // Upload card if provided (optional)
+    if (cardFile) {
+      const filename = `reddit_card_${Date.now()}.png`;
+      await supabaseClient.storage.from('reddit-cards').upload(filename, cardFile);
+      const { data: { publicUrl } } = supabaseClient.storage.from('reddit-cards').getPublicUrl(filename);
+      customCardUrl = publicUrl;
+    }
+    
+    // Update job with edited content and card (if provided)
     await supabaseClient.from("ai_shorts_queue").update({
-      title, script, custom_card_url: publicUrl, status: "ready"
+      title, 
+      script, 
+      custom_card_url: customCardUrl,
+      status: "ready"
     }).eq("id", jobId);
+    
     alert("✅ Approved! Worker will create video.");
     loadFetchedJobs();
     loadRedditQueue();
